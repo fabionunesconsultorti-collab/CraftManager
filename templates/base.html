@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gerencia Personalizados{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        <nav class="sidebar glass-effect">
+            <div class="logo">
+                <i class="fa-solid fa-shapes"></i>
+                <h2>CraftManager</h2>
+            </div>
+            
+            <ul class="nav-links">
+                <li><a href="{{ url_for('novo_pedido') }}" class="nav-item" style="background: var(--primary-color); color: white; justify-content: center; margin-bottom: 1rem; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);"><i class="fa-solid fa-plus-circle"></i> Novo Pedido</a></li>
+                <li><a href="{{ url_for('dashboard') }}" class="nav-item"><i class="fa-solid fa-house"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('kanban') }}" class="nav-item"><i class="fa-solid fa-kanban"></i> Kanban Pedidos</a></li>
+                <li><a href="{{ url_for('gerenciar_pedidos') }}" class="nav-item"><i class="fa-solid fa-list-check"></i> Gestão de Pedidos</a></li>
+                <li><a href="{{ url_for('gerenciar_clientes') }}" class="nav-item"><i class="fa-solid fa-users"></i> Clientes</a></li>
+                <li><a href="{{ url_for('gerenciar_produtos') }}" class="nav-item"><i class="fa-solid fa-book-open"></i> Portfólio (Catálogo)</a></li>
+                <li><a href="{{ url_for('calculadora_produto') }}" class="nav-item"><i class="fa-solid fa-calculator"></i> Calculadora (CUT)</a></li>
+                <li><a href="{{ url_for('gerenciar_materiais') }}" class="nav-item"><i class="fa-solid fa-box"></i> Insumos & Custos</a></li>
+                <li><a href="{{ url_for('gerenciar_equipamentos') }}" class="nav-item"><i class="fa-solid fa-print"></i> Depreciação</a></li>
+                <li><a href="{{ url_for('engenharia_custos') }}" class="nav-item"><i class="fa-solid fa-industry"></i> Eng. de Custos (VHT)</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <header class="top-header glass-effect">
+                <div class="breadcrumb">
+                    <h1>{% block page_heading %}Painel{% endblock %}</h1>
+                </div>
+                <div class="user-profile">
+                    <img src="https://ui-avatars.com/api/?name=Admin+User&background=6366f1&color=fff" alt="User Avatar" class="avatar">
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Script Base -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const currentUrl = window.location.pathname;
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                if (item.getAttribute('href') === currentUrl) {
+                    navItems.forEach(n => n.classList.remove('active'));
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Kanban Pedidos | CraftManager{% endblock %}
+
+{% block page_heading %}Painel Kanban{% endblock %}
+
+{% block content %}
+<div class="kanban-board" id="kanbanBoard">
+    <!-- Colunas geradas via JS -->
+    <div class="kanban-column" data-fase="Primeiro Contato">
+        <div class="column-header">
+            <h3>Primeiro Contato</h3>
+            <span class="card-count">0</span>
+        </div>
+        <div class="column-content" id="col-primeiro-contato">
+            <!-- Cards go here -->
+        </div>
+    </div>
+    
+    <div class="kanban-column" data-fase="Novo Pedido">
+        <div class="column-header">
+            <h3>Novo Pedido</h3>
+            <span class="card-count">0</span>
+        </div>
+        <div class="column-content" id="col-novo-pedido"></div>
+    </div>
+
+    <div class="kanban-column" data-fase="Em Produção">
+        <div class="column-header">
+            <h3>Em Produção</h3>
+            <span class="card-count">0</span>
+        </div>
+        <div class="column-content" id="col-em-producao"></div>
+    </div>
+
+    <div class="kanban-column" data-fase="Entrega">
+        <div class="column-header">
+            <h3>Entrega</h3>
+            <span class="card-count">0</span>
+        </div>
+        <div class="column-content" id="col-entrega"></div>
+    </div>
+
+    <div class="kanban-column" data-fase="Pós Venda">
+        <div class="column-header">
+            <h3>Pós Venda</h3>
+            <span class="card-count">0</span>
+        </div>
+        <div class="column-content" id="col-pos-venda"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Inicialização do Drag and Drop
+    const draggables = [];
+    const containers = document.querySelectorAll('.column-content');
+    
+    // Função para carregar pedidos via API
+    async function loadPedidos() {
+        try {
+            const response = await fetch('/api/pedidos');
+            const data = await response.json();
+            
+            // Limpa as colunas
+            containers.forEach(container => container.innerHTML = '');
+            
+            data.forEach(pedido => {
+                const card = createCardElement(pedido);
+                const colTargetId = `col-${pedido.fase_kanban.toLowerCase().replace(' ', '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "")}`;
+                const containerTarget = document.getElementById(colTargetId);
+                
+                if (containerTarget) {
+                    containerTarget.appendChild(card);
+                }
+            });
+            
+            updateCounts();
+            setupDragAndDrop();
+        } catch (error) {
+            console.error("Erro ao carregar dados", error);
+        }
+    }
+
+    function createCardElement(pedido) {
+        const div = document.createElement('div');
+        div.classList.add('kanban-card');
+        div.setAttribute('draggable', 'true');
+        div.dataset.id = pedido.id;
+        
+        let zapLink = '#';
+        if (pedido.cliente_telefone) {
+            let phone = pedido.cliente_telefone.replace(/\D/g,'');
+            if (phone.length >= 10 && phone.length <= 11) {
+                zapLink = `https://wa.me/55${phone}?text=Olá%20${encodeURIComponent(pedido.cliente_nome)},%20referente%20ao%20seu%20projeto%20${encodeURIComponent(pedido.produto_nome)}`;
+            }
+        }
+        
+        div.innerHTML = `
+            <div class="card-title">${pedido.produto_nome}</div>
+            <div class="card-client"><i class="fa-solid fa-user"></i> ${pedido.cliente_nome}</div>
+            <div class="card-value">R$ ${pedido.valor_total.toFixed(2).replace('.', ',')}</div>
+            <div class="card-actions">
+                <a href="${zapLink}" target="_blank" class="btn-whatsapp">
+                    <i class="fa-brands fa-whatsapp"></i> Chat
+                </a>
+                <!-- Future edits could go here -->
+            </div>
+        `;
+        return div;
+    }
+
+    function setupDragAndDrop() {
+        const cards = document.querySelectorAll('.kanban-card');
+        
+        cards.forEach(card => {
+            card.addEventListener('dragstart', () => {
+                card.classList.add('is-dragging');
+            });
+            
+            card.addEventListener('dragend', () => {
+                card.classList.remove('is-dragging');
+                updateCounts();
+            });
+        });
+        
+        containers.forEach(container => {
+            container.addEventListener('dragover', e => {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(container, e.clientY);
+                const draggable = document.querySelector('.is-dragging');
+                if (afterElement == null) {
+                    container.appendChild(draggable);
+                } else {
+                    container.insertBefore(draggable, afterElement);
+                }
+            });
+
+            container.addEventListener('drop', async e => {
+                const draggable = document.querySelector('.is-dragging');
+                if (draggable) {
+                    const cardId = draggable.dataset.id;
+                    const novaFase = container.closest('.kanban-column').dataset.fase;
+                    
+                    // API Call to update database
+                    try {
+                        await fetch(`/api/pedidos/${cardId}/fase`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ fase_kanban: novaFase })
+                        });
+                    } catch (error) {
+                        console.error("Erro ao atualizar fase", error);
+                    }
+                }
+            });
+        });
+    }
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.kanban-card:not(.is-dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    function updateCounts() {
+        document.querySelectorAll('.kanban-column').forEach(col => {
+            const count = col.querySelectorAll('.kanban-card').length;
+            col.querySelector('.card-count').innerText = count;
+        });
+    }
+
+    // Inicializa a tela carregando os dados do backend
+    loadPedidos();
+});
+</script>
+{% endblock %}

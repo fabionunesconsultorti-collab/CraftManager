@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Calculadora CUT e Markup | CraftManager{% endblock %}
+
+{% block page_heading %}🧮 Calculadora de Produto Inteligente{% endblock %}
+
+{% block head %}
+<style>
+    .calc-layout {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 2rem;
+    }
+    .panel {
+        background: var(--surface-color);
+        border: 1px solid var(--surface-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-color);
+    }
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--surface-border);
+        border-radius: 0.5rem;
+        color: white;
+        font-size: 1rem;
+    }
+    .row { display: flex; gap: 1rem; }
+    .col { flex: 1; }
+    
+    .list-insumos { margin-top: 1rem; }
+    .insumo-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: rgba(255,255,255,0.05);
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    button {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: 0.3s;
+    }
+    button:hover { background: var(--primary-hover); }
+
+    .result-box {
+        text-align: center;
+        padding: 2rem;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+        border: 1px solid var(--primary-color);
+        border-radius: 1rem;
+        margin-top: 1.5rem;
+    }
+    .result-price {
+        font-size: 3rem;
+        font-weight: 700;
+        color: var(--success);
+        margin: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="calc-layout">
+    <div class="panel">
+        <h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">Ficha Técnica do Produto</h3>
+        
+        <div class="row">
+            <div class="col form-group">
+                <label>Nome do Produto (Ex: Topo de Bolo Luxo)</label>
+                <input type="text" class="form-control" id="prod-nome">
+            </div>
+            <div class="col form-group">
+                <label>Fotos (Representação Visual)</label>
+                <input type="file" id="prod-imagens" class="form-control" accept="image/*" multiple style="padding: 0.5rem 1rem;">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col form-group" style="max-width: 50%;">
+                <label>Tempo Produção (Minutos)</label>
+                <input type="number" class="form-control" id="prod-tempo" value="30">
+            </div>
+        </div>
+
+        <hr style="border: 1px solid var(--surface-border); margin: 1rem 0;">
+        
+        <h4>Adicionar Materiais e Consumíveis</h4>
+        <div class="row" style="margin-top: 1rem;">
+            <div class="col form-group">
+                <select class="form-control" id="select-material"></select>
+            </div>
+            <div class="col form-group" style="max-width: 150px;">
+                <input type="number" step="0.1" class="form-control" id="qtd-material" placeholder="Qtd" value="1">
+            </div>
+            <button onclick="addMaterial()">Add</button>
+        </div>
+
+        <div class="list-insumos" id="lista-materiais-ui">
+            <!-- Items added here -->
+        </div>
+
+        <hr style="border: 1px solid var(--surface-border); margin: 1.5rem 0;">
+
+        <div class="row">
+            <div class="col form-group">
+                <label>% Perda Técnica (Sobras/Erros)</label>
+                <input type="number" class="form-control" id="prod-perda" value="5">
+            </div>
+        </div>
+
+    </div>
+
+    <div class="panel">
+        <h3 style="margin-bottom: 1.5rem; color: var(--warning);">Composição de Preço (Markup)</h3>
+        
+        <div class="form-group">
+            <label>Custo Fixo + Mão de Obra (VHT) atualizado</label>
+            <div style="color: var(--text-muted); font-size: 0.9rem;" id="info-vht">Carregando...</div>
+        </div>
+
+        <div class="row">
+            <div class="col form-group">
+                <label>% Impostos (Simples)</label>
+                <input type="number" class="form-control calc-trigger" id="mk-imposto" value="0">
+            </div>
+            <div class="col form-group">
+                <label>% Comissão Marketplace</label>
+                <input type="number" class="form-control calc-trigger" id="mk-comissao" value="18">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>% Margem de Lucro Desejada</label>
+            <input type="number" class="form-control calc-trigger" id="mk-lucro" value="30">
+        </div>
+
+        <div class="result-box">
+            <h4>Preço Exato de Venda</h4>
+            <div class="result-price" id="preco-venda">R$ 0,00</div>
+            <div style="font-size: 0.9rem; color: var(--text-muted);" id="resumo-detalhe">
+                Custo de R$ 0,00 • Markup: 1.0
+            </div>
+            
+            <div id="alerta-comissao" style="margin-top: 1rem; color: var(--danger); font-size: 0.85rem; display: none;">
+                <i class="fa-solid fa-triangle-exclamation"></i> Venda em Marketplaces costuma cobrar taxa fixa (Ex: R$ 5,00 por item além do percentual). Sugerimos transformar itens de baixo custo em Kits (Combos)!
+            </div>
+
+            <button type="button" onclick="salvarProdutoCalculado()" style="width:100%; margin-top:1.5rem; background:#10b981"><i class="fa-solid fa-save"></i> Imortalizar no Catálogo de Vendas</button>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let VHT = 0;
+    let catalogoMateriais = [];
+    let materiaisUsados = [];
+
+    // Busca valor da hora tecnica do servior
+    async function loadConfig() {
+        let res = await fetch('/api/engenharia/vht');
+        let data = await res.json();
+        VHT = data.vht_calculado; // Valor Hora Tecnica
+        document.getElementById('info-vht').innerText = `R$ ${VHT.toFixed(2).replace('.',',')} por hora`;
+
+        // Busca o catalogo
+        res = await fetch('/api/catalogo_calculos');
+        let cat = await res.json();
+        catalogoMateriais = cat.materiais.concat(cat.desgastes);
+        
+        let target = document.getElementById('select-material');
+        catalogoMateriais.forEach(item => {
+            let opt = document.createElement('option');
+            opt.value = item.id;
+            opt.innerText = item.nome + ` (R$ ${item.custo_unidade ? item.custo_unidade.toFixed(2) : item.custo_ciclo.toFixed(2)})`;
+            target.appendChild(opt);
+        });
+        calcularTudo();
+    }
+
+    function addMaterial() {
+        let select = document.getElementById('select-material');
+        let id_material = select.value;
+        let qtd = parseFloat(document.getElementById('qtd-material').value);
+        if(!qtd || qtd <= 0) return;
+
+        let mat_db = catalogoMateriais.find(x => x.id == id_material);
+        let custo = mat_db.custo_unidade || mat_db.custo_ciclo;
+        
+        materiaisUsados.push({
+            nome: mat_db.nome,
+            qtd: qtd,
+            custo_total: qtd * custo
+        });
+
+        renderMateriais();
+        calcularTudo();
+    }
+
+    function renderMateriais() {
+        let div = document.getElementById('lista-materiais-ui');
+        div.innerHTML = '';
+        materiaisUsados.forEach(m => {
+            div.innerHTML += `
+                <div class="insumo-item">
+                    <span>${m.qtd}x ${m.nome}</span>
+                    <strong style="color:var(--warning)">R$ ${m.custo_total.toFixed(2)}</strong>
+                </div>
+            `;
+        });
+    }
+
+    function calcularTudo() {
+        if(VHT === 0) return;
+
+        // 1. Custo dos Materiais
+        let custo_materiais = materiaisUsados.reduce((acc, curr) => acc + curr.custo_total, 0);
+
+        // 2. Perda Tecnica
+        let perda = parseFloat(document.getElementById('prod-perda').value) || 0;
+        let custo_com_perda = custo_materiais * (1 + (perda/100));
+
+        // 3. Custo de Mao de Obra (Horas ou Minutos * VHT)
+        let minutos = parseInt(document.getElementById('prod-tempo').value) || 0;
+        let custo_mao_obra = (minutos / 60) * VHT;
+
+        // CUT (Custo Unitario Total)
+        let CUT = custo_com_perda + custo_mao_obra;
+
+        // 4. Calculo de Markup
+        let impostos = parseFloat(document.getElementById('mk-imposto').value) || 0;
+        let comissao = parseFloat(document.getElementById('mk-comissao').value) || 0;
+        let lucro = parseFloat(document.getElementById('mk-lucro').value) || 0;
+
+        let total_deducoes = impostos + comissao + lucro;
+        let markup = 1;
+        let preco_final = CUT;
+        let taxaDivisor = (100 - total_deducoes) / 100;
+
+        if(taxaDivisor <= 0) {
+            document.getElementById('preco-venda').innerText = "ERRO: Taxas excedem limite!";
+            return;
+        }
+
+        markup = 1 / taxaDivisor;
+        preco_final = CUT * markup;
+
+        // UX Updates
+        document.getElementById('preco-venda').innerText = `R$ ${preco_final.toFixed(2).replace('.',',')}`;
+        document.getElementById('resumo-detalhe').innerText = `Custo Bruto Unitário (CUT): R$ ${CUT.toFixed(2)} • Índice Markup: ${markup.toFixed(2)}`;
+
+        // Alerta Comissao
+        if(comissao > 5 && preco_final < 40) {
+            document.getElementById('alerta-comissao').style.display = 'block';
+        } else {
+            document.getElementById('alerta-comissao').style.display = 'none';
+        }
+    }
+
+    async function salvarProdutoCalculado() {
+        let nomeProd = document.getElementById('prod-nome').value;
+        if(!nomeProd) {
+            alert('Por favor, dê um nome ao produto (Ex: Topo de Bolo Luxo).');
+            return;
+        }
+        
+        // Puxa o numero limpo da interface
+        let valorVendaArr = document.getElementById('preco-venda').innerText.replace('R$ ','').replace(',','.');
+        let pr = parseFloat(valorVendaArr);
+        if(!pr || pr === 0) { alert('Cálculo inválido'); return; }
+
+        let formData = new FormData();
+        formData.append('nome', nomeProd);
+        formData.append('tempo_producao_minutos', document.getElementById('prod-tempo').value);
+        formData.append('perda_tecnica_percentual', document.getElementById('prod-perda').value);
+        formData.append('preco_venda', pr);
+        
+        let imagensInput = document.getElementById('prod-imagens');
+        for(let i=0; i < imagensInput.files.length; i++) {
+            formData.append('imagens', imagensInput.files[i]);
+        }
+
+        let res = await fetch('/api/produtos', {
+            method: 'POST',
+            body: formData
+        });
+        
+        let data = await res.json();
+        if(data.status === 'success'){
+            alert("Produto salvo no catálogo com sucesso! Agora você pode criar vendas dele abrindo um Novo Pedido.");
+        }
+    }
+
+    document.querySelectorAll('.calc-trigger, #prod-tempo, #prod-perda').forEach(el => {
+        el.addEventListener('input', calcularTudo);
+    });
+
+    document.addEventListener('DOMContentLoaded', loadConfig);
+</script>
+{% endblock %}

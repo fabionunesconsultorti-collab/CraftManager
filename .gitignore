@@ -1,0 +1,29 @@
+# Ambientes Virtuais de Python
+venv/
+env/
+.env
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Bancos de Dados Local (Dados Sensíveis dos seus Clientes/Vendas)
+instance/
+gerencia.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs de Erros ou Informações do Servidor
+flask.log
+*.log
+
+# Diretório de Imagens Subidas
+# (Ignoramos as imagens de produtos reais que foram "upadas" da sua máquina)
+static/uploads/produtos/*
+!static/uploads/produtos/.gitkeep
+
+# Arquivos de IDE ou Sistema Operacional
+.vscode/
+.DS_Store

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Portfólio de Produtos | CraftManager{% endblock %}
+
+{% block page_heading %}🛍️ Portfólio de Produtos Cadastrados{% endblock %}
+
+{% block head %}
+<style>
+    .controls {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;
+    }
+    
+    .view-toggles {
+        display: flex; gap: 0.5rem; background: var(--surface-color); padding: 0.5rem;
+        border-radius: 0.5rem; border: 1px solid var(--surface-border);
+    }
+    .toggle-btn {
+        background: transparent; color: var(--text-muted); border: none; padding: 0.5rem 1rem;
+        border-radius: 0.3rem; cursor: pointer; transition: 0.2s; font-weight: 500;
+    }
+    .toggle-btn.active {
+        background: var(--primary-color); color: white;
+    }
+
+    /* GRID VIEW (Galeria) */
+    .grid-view {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;
+    }
+    .product-card {
+        background: var(--surface-color); border: 1px solid var(--surface-border);
+        border-radius: 1rem; overflow: hidden; transition: transform 0.2s;
+        display: flex; flex-direction: column;
+    }
+    .product-card:hover { transform: translateY(-5px); border-color: var(--primary-color); }
+    .card-img-placeholder {
+        width: 100%; height: 200px;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text-muted); font-size: 3rem; object-fit: cover;
+    }
+    .card-img { width: 100%; height: 200px; object-fit: cover; border-bottom: 1px solid var(--surface-border); }
+    .card-body { padding: 1.5rem; display: flex; flex-direction: column; flex: 1; }
+    .card-title { font-size: 1.1rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600;}
+    .card-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+    .card-price { font-size: 1.5rem; color: var(--success); font-weight: bold; margin-bottom: 1rem; }
+    
+    .btn-danger {
+        background: rgba(239, 68, 68, 0.1); color: var(--danger);
+        border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.6rem; border-radius: 0.5rem;
+        cursor: pointer; font-weight: 500; width: 100%; transition: 0.2s; margin-top: auto;
+    }
+    .btn-danger:hover { background: var(--danger); color: white; }
+
+    /* TABLE VIEW (Lista) */
+    .table-view { display: none; overflow-x: auto; }
+    .table-custom {
+        width: 100%; border-collapse: collapse; background: var(--surface-color);
+        border-radius: 1rem; overflow: hidden; border: 1px solid var(--surface-border);
+    }
+    .table-custom th { text-align: left; padding: 1.2rem 1rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--surface-border); }
+    .table-custom td { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff;}
+    .thumb-img { width: 50px; height: 50px; object-fit: cover; border-radius: 0.4rem; vertical-align: middle; margin-right: 1rem; border: 1px solid var(--surface-border); }
+    .thumb-placeholder { 
+        width: 50px; height: 50px; border-radius: 0.4rem; vertical-align: middle; margin-right: 1rem;
+        background: rgba(255,255,255,0.1); color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="controls">
+    <p style="color: var(--text-muted);">Produtos salvos através da sua <strong>Calculadora CUT</strong></p>
+    <div class="view-toggles">
+        <button class="toggle-btn active" id="btn-grid" onclick="setView('grid')"><i class="fa-solid fa-border-all"></i> Galeria</button>
+        <button class="toggle-btn" id="btn-list" onclick="setView('list')"><i class="fa-solid fa-list"></i> Lista</button>
+    </div>
+</div>
+
+<!-- GRID VIEW -->
+<div class="grid-view" id="container-grid">
+    <!-- Renderizado via JS -->
+</div>
+
+<!-- TABLE VIEW -->
+<div class="table-view" id="container-list">
+    <table class="table-custom">
+        <thead>
+            <tr>
+                <th>Produto e Imagem</th>
+                <th>Tempo de Prod.</th>
+                <th>Preço Final (Calculado)</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="lista-tbody">
+            <!-- Renderizado via JS -->
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentView = 'grid'; // 'grid' ou 'list'
+
+    function setView(viewMode) {
+        currentView = viewMode;
+        document.getElementById('btn-grid').classList.toggle('active', viewMode === 'grid');
+        document.getElementById('btn-list').classList.toggle('active', viewMode === 'list');
+        
+        document.getElementById('container-grid').style.display = viewMode === 'grid' ? 'grid' : 'none';
+        document.getElementById('container-list').style.display = viewMode === 'list' ? 'block' : 'none';
+    }
+
+    async function loadProdutos() {
+        let res = await fetch('/api/produtos');
+        let prods = await res.json();
+        
+        let cGrid = document.getElementById('container-grid');
+        let cList = document.getElementById('lista-tbody');
+        
+        cGrid.innerHTML = '';
+        cList.innerHTML = '';
+
+        if(prods.length === 0) {
+            cGrid.innerHTML = `<p style="color:var(--text-muted); grid-column: 1/-1; text-align:center;">Nenhum produto no catálogo. Vá até a calculadora e salve seu primeiro!</p>`;
+        }
+
+        prods.forEach(p => {
+            let imgHTML_Grid = p.imagem_capa ? `<img src="/static/uploads/produtos/${p.imagem_capa}" class="card-img" alt="${p.nome}">` : `<div class="card-img-placeholder"><i class="fa-solid fa-box-open"></i></div>`;
+            let imgHTML_List = p.imagem_capa ? `<img src="/static/uploads/produtos/${p.imagem_capa}" class="thumb-img" alt="${p.nome}">` : `<div class="thumb-placeholder"><i class="fa-solid fa-image"></i></div>`;
+            let photosCount = p.todas_imagens && p.todas_imagens.length > 1 ? `<br><small style="color:var(--text-muted)">+ ${p.todas_imagens.length - 1} fotos na galeria</small>` : '';
+
+            // Render Grid Card
+            cGrid.innerHTML += `
+                <div class="product-card">
+                    ${imgHTML_Grid}
+                    <div class="card-body">
+                        <div class="card-title">${p.nome}</div>
+                        <div class="card-meta"><i class="fa-solid fa-clock"></i> ${p.tempo_producao_minutos} min de Produção Oficial ${photosCount}</div>
+                        <div class="card-price">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</div>
+                        <button class="btn-danger" onclick="excluirProduto(${p.id})"><i class="fa-solid fa-trash"></i> Retirar do Catálogo</button>
+                    </div>
+                </div>
+            `;
+
+            // Render List Row
+            cList.innerHTML += `
+                <tr>
+                    <td>${imgHTML_List} <strong>${p.nome}</strong> ${photosCount}</td>
+                    <td>${p.tempo_producao_minutos} minutos</td>
+                    <td style="color:var(--success); font-weight:bold;">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</td>
+                    <td>
+                        <button class="btn-danger" style="width: auto; padding: 0.4rem 0.8rem;" onclick="excluirProduto(${p.id})"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    async function excluirProduto(id) {
+        if(confirm("Tem certeza que deseja apagar este produto do seu portfólio? Isso removerá as imagens do servidor, mas não apagará os itens que já foram vendidos e registrados no histórico.")) {
+            await fetch('/api/produtos/' + id, { method: 'DELETE' });
+            loadProdutos();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadProdutos();
+    });
+</script>
+{% endblock %}

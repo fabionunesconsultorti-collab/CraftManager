@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Pedidos | CraftManager{% endblock %}
+
+{% block page_heading %}📝 Gestão Completa de Pedidos{% endblock %}
+
+{% block head %}
+<style>
+    .panel {
+        background: var(--surface-color);
+        border: 1px solid var(--surface-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+    .table-custom {
+        width: 100%; border-collapse: collapse; margin-top: 1rem;
+        font-size: 0.95rem;
+    }
+    .table-custom th { text-align: left; padding: 1rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--surface-border); }
+    .table-custom td { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff;}
+    
+    .badge-status {
+        padding: 0.3rem 0.6rem; border-radius: 0.4rem; font-size: 0.85rem; font-weight: 600;
+        background: rgba(255,255,255,0.1); color: #fff; display: inline-block;
+    }
+
+    .btn-action {
+        background: var(--surface-border); color: white; border: none;
+        padding: 0.4rem 0.6rem; border-radius: 0.3rem; cursor: pointer;
+        font-size: 0.85rem; margin-right: 0.3rem; transition: 0.2s;
+        text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .btn-action:hover { background: var(--primary-color); }
+    .btn-action.danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .btn-action.danger:hover { background: var(--danger); color: white; }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal-box {
+        background: var(--surface-color); border: 1px solid var(--surface-border);
+        border-radius: 1rem; padding: 2rem; width: 400px; max-width: 90%;
+    }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: var(--text-muted); font-size: 0.9rem;}
+    .form-control {
+        width: 100%; padding: 0.6rem 1rem; background: rgba(0,0,0,0.2); 
+        border: 1px solid var(--surface-border); border-radius: 0.5rem; color: white;
+    }
+    .btn-submit {
+        background: var(--primary-color); color: white; border: none;
+        padding: 0.6rem 1.2rem; border-radius: 0.5rem; cursor: pointer;
+        font-weight: 500; width: 100%; margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="overflow-x: auto;">
+    <table class="table-custom">
+        <thead>
+            <tr>
+                <th>Cód. / Data</th>
+                <th>Cliente</th>
+                <th>Itens ou Resumo</th>
+                <th>Pagamento</th>
+                <th>Valor Total</th>
+                <th>Status da Produção</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="lista-pedidos">
+            <!-- Renderizado via JS -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Edição -->
+<div class="modal-overlay" id="modalEdicao">
+    <div class="modal-box">
+        <h3 style="color: white; margin-top: 0; margin-bottom: 1.5rem;"><i class="fa-solid fa-pen-to-square"></i> Atualizar Pedido <span id="edit-id-label"></span></h3>
+        <input type="hidden" id="edit-id">
+        
+        <div class="form-group">
+            <label>Fase do KanBan (Status)</label>
+            <select class="form-control" id="edit-fase">
+                <option value="Novo Pedido">Novo Pedido</option>
+                <option value="Primeiro Contato">Primeiro Contato</option>
+                <option value="Ag. Aprovação Arte">Ag. Aprovação Arte</option>
+                <option value="Arte Aprovada">Arte Aprovada</option>
+                <option value="Em Produção">Em Produção</option>
+                <option value="Pronto para Retirada">Pronto para Retirada</option>
+                <option value="Finalizado">Finalizado</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Forma de Pagamento</label>
+            <input type="text" class="form-control" id="edit-pagamento" placeholder="Ex: PIX (Pago Metade)">
+        </div>
+        
+        <div class="form-group">
+            <label>Notas Técnicas / Resumo Geral</label>
+            <textarea class="form-control" id="edit-notas" rows="3"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn-submit" onclick="salvarEdicao()">Salvar Alterações</button>
+            <button class="btn-submit" style="background: transparent; border: 1px solid var(--surface-border);" onclick="fecharModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let pedidosGlobal = [];
+
+    async function carregarPedidos() {
+        let res = await fetch('/api/pedidos');
+        pedidosGlobal = await res.json();
+        
+        let container = document.getElementById('lista-pedidos');
+        container.innerHTML = '';
+        
+        pedidosGlobal.forEach(p => {
+            container.innerHTML += `
+                <tr>
+                    <td>
+                        <strong style="color:var(--primary-color);">#${String(p.id).padStart(4, '0')}</strong><br>
+                        <small style="color:var(--text-muted);">${p.data_criacao}</small>
+                    </td>
+                    <td>
+                        <strong>${p.cliente_nome}</strong><br>
+                        <small style="color:var(--text-muted);">${p.cliente_telefone}</small>
+                    </td>
+                    <td>${p.produto_nome}</td>
+                    <td>${p.forma_pagamento || '-'}</td>
+                    <td style="font-weight: 600;">R$ ${p.valor_total.toFixed(2)}</td>
+                    <td><span class="badge-status">${p.fase_kanban}</span></td>
+                    <td style="white-space: nowrap;">
+                        <button class="btn-action" title="Editar Pedido" onclick="abrirModal(${p.id})"><i class="fa-solid fa-pen"></i></button>
+                        <a href="/orcamento/${p.id}" target="_blank" class="btn-action" title="Imprimir Orçamento/Pedido"><i class="fa-solid fa-file-invoice-dollar"></i></a>
+                        <a href="/recibo/${p.id}" target="_blank" class="btn-action" title="Imprimir Recibo de Pgto"><i class="fa-solid fa-receipt"></i></a>
+                        <button class="btn-action danger" title="Excluir Definitivamente" onclick="excluirPedido(${p.id})"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function abrirModal(id) {
+        let p = pedidosGlobal.find(x => x.id === id);
+        if(!p) return;
+        document.getElementById('edit-id').value = p.id;
+        document.getElementById('edit-id-label').innerText = `#${p.id}`;
+        document.getElementById('edit-fase').value = p.fase_kanban;
+        document.getElementById('edit-pagamento').value = p.forma_pagamento || '';
+        document.getElementById('edit-notas').value = p.descricao || '';
+        document.getElementById('modalEdicao').style.display = 'flex';
+    }
+
+    function fecharModal() {
+        document.getElementById('modalEdicao').style.display = 'none';
+    }
+
+    async function salvarEdicao() {
+        let id = document.getElementById('edit-id').value;
+        let pLoad = {
+            fase_kanban: document.getElementById('edit-fase').value,
+            forma_pagamento: document.getElementById('edit-pagamento').value,
+            descricao_geral: document.getElementById('edit-notas').value
+        };
+
+        await fetch('/api/pedidos/' + id, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(pLoad)
+        });
+        
+        fecharModal();
+        carregarPedidos();
+    }
+
+    async function excluirPedido(id) {
+        if(confirm("Tem certeza absoluta? O pedido e seu histórico de itens serão excluídos em definitivo!")) {
+            await fetch('/api/pedidos/' + id, { method: 'DELETE' });
+            carregarPedidos();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', carregarPedidos);
+</script>
+{% endblock %}

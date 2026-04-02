@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Inventário de Materiais | CraftManager{% endblock %}
+
+{% block page_heading %}📦 Controle de Insumos e Consumíveis{% endblock %}
+
+{% block head %}
+<style>
+    .split-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+
+    .form-panel, .list-panel {
+        background: var(--surface-color);
+        border: 1px solid var(--surface-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+
+    .section-title {
+        color: var(--primary-color);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: var(--text-muted); font-size: 0.9rem;}
+    .form-control {
+        width: 100%; padding: 0.6rem 1rem;
+        background: rgba(0,0,0,0.2); border: 1px solid var(--surface-border);
+        border-radius: 0.5rem; color: white;
+    }
+
+    .btn-submit {
+        background: var(--primary-color); color: white; border: none;
+        padding: 0.6rem 1.2rem; border-radius: 0.5rem; cursor: pointer;
+        font-weight: 500; width: 100%; margin-top: 1rem; transition: 0.3s;
+    }
+    .btn-submit:hover { background: var(--primary-hover); }
+
+    .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: white; }
+
+    .table-custom {
+        width: 100%; border-collapse: collapse; margin-top: 1rem;
+    }
+    .table-custom th { text-align: left; padding: 0.8rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--surface-border); }
+    .table-custom td { padding: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    
+    .badge-price {
+        background: rgba(16, 185, 129, 0.2); color: var(--success);
+        padding: 0.2rem 0.5rem; border-radius: 0.3rem; font-weight: bold; font-size: 0.85rem;
+    }
+
+    .tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--surface-border); padding-bottom: 0.5rem;}
+    .tab { cursor: pointer; color: var(--text-muted); font-weight: 600; padding: 0.5rem; }
+    .tab.active { color: var(--primary-color); border-bottom: 2px solid var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('materiais')" id="tab-materiais">Matéria-Prima Convencional</div>
+    <div class="tab" onclick="switchTab('desgastes')" id="tab-desgastes">Consumíveis e Lâminas Reativas</div>
+</div>
+
+<div class="split-layout" id="view-materiais">
+    <!-- CADASTRO MATERIAL -->
+    <div class="form-panel">
+        <h3 class="section-title"><i class="fa-solid fa-plus"></i> Novo Material de Estoque</h3>
+        <p style="color:var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">O sistema calculará automaticamente o Custo Unitário (CUT) com base na embalagem fechada.</p>
+        
+        <form id="form-material" onsubmit="event.preventDefault(); salvarMaterial();">
+            <div class="form-group">
+                <label>Nome do Insumo (Ex: Papel Offset A4 180g)</label>
+                <input type="text" class="form-control" id="mat-nome" required>
+            </div>
+            
+            <div style="display: flex; gap: 1rem;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Unidade de Medida</label>
+                    <select class="form-control" id="mat-un" required>
+                        <option value="folha">Folhas</option>
+                        <option value="metro">Metros</option>
+                        <option value="unidade">Unidades</option>
+                        <option value="grama">Gramas</option>
+                        <option value="pote">Pote/Lata</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Qtd. na Embalagem</label>
+                    <input type="number" step="0.1" class="form-control" id="mat-qtd" placeholder="ex: 50" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Preço Pago no Pacote/Embalagem Bruta (R$)</label>
+                <input type="number" step="0.01" class="form-control" id="mat-preco" placeholder="ex: 25.00" required>
+            </div>
+
+            <div class="form-group">
+                <label>Link de Compra (Opcional)</label>
+                <input type="url" class="form-control" id="mat-link" placeholder="https://shopee.com/.../produto">
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Estoque Atual</label>
+                    <input type="number" step="0.1" class="form-control" id="mat-estoque-atual" placeholder="ex: 100" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Alerta: Estoque Mínimo</label>
+                    <input type="number" step="0.1" class="form-control" id="mat-estoque-minimo" placeholder="ex: 20" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">Registrar Insumo</button>
+        </form>
+    </div>
+
+    <!-- LISTA MATERIAL -->
+    <div class="list-panel">
+        <h3 class="section-title"><i class="fa-solid fa-list"></i> Biblioteca de Matérias-Primas</h3>
+        <div style="overflow-x: auto;">
+            <table class="table-custom">
+                <thead>
+                    <tr>
+                        <th>Insumo</th>
+                        <th>Estoque (Atual / Mínimo)</th>
+                        <th>Custo Fracionado (Unidade)</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-materiais">
+                    <!-- Gerado via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="split-layout" id="view-desgastes" style="display: none;">
+    <!-- CADASTRO DESGASTE -->
+    <div class="form-panel">
+        <h3 class="section-title"><i class="fa-solid fa-scissors"></i> Novo Consumível e Lâmina</h3>
+        <p style="color:var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">Itens que desgastam lentamente mas impactam a engenharia de custo final.</p>
+        
+        <form id="form-desgaste" onsubmit="event.preventDefault(); salvarDesgaste();">
+            <div class="form-group">
+                <label>Nome do Consumível (Ex: Lâmina Silhouette Automática)</label>
+                <input type="text" class="form-control" id="desg-nome" required>
+            </div>
+            
+            <div style="display: flex; gap: 1rem;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Preço Pago (R$)</label>
+                    <input type="number" step="0.01" class="form-control" id="desg-custo" placeholder="150" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Rendimento Estimado (Em Cortes/Ciclos)</label>
+                    <input type="number" class="form-control" id="desg-ciclos" placeholder="Ex: 500" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">Registrar Desgaste</button>
+        </form>
+    </div>
+
+    <!-- LISTA DESGASTES -->
+    <div class="list-panel">
+        <h3 class="section-title"><i class="fa-solid fa-list"></i> Controle de Consumíveis Ativos</h3>
+        <div style="overflow-x: auto;">
+            <table class="table-custom">
+                <thead>
+                    <tr>
+                        <th>Consumível</th>
+                        <th>Diluição por Ciclo (Custo)</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-desgastes">
+                    <!-- Gerado via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        
+        document.getElementById('view-materiais').style.display = tab === 'materiais' ? 'grid' : 'none';
+        document.getElementById('view-desgastes').style.display = tab === 'desgastes' ? 'grid' : 'none';
+    }
+
+    async function loadData() {
+        let res = await fetch('/api/catalogo_calculos');
+        let data = await res.json();
+        
+        // Renderiza Materiais
+        let listM = document.getElementById('lista-materiais');
+        listM.innerHTML = '';
+        data.materiais.forEach(m => {
+            let trStyle = "";
+            let alertBadge = "";
+            if (m.quantidade_minima > 0 && m.quantidade_atual <= m.quantidade_minima) {
+                trStyle = "background: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--danger);";
+                alertBadge = `<div style="color: var(--danger); font-size: 0.75rem; font-weight: bold; margin-top: 0.2rem;"><i class="fa-solid fa-triangle-exclamation"></i> ALERTA: REPOR ESTOQUE</div>`;
+                if(m.link_compra) {
+                    alertBadge += `<a href="${m.link_compra}" target="_blank" style="font-size: 0.75rem; color: var(--primary-color); text-decoration: none; display: inline-block; margin-top: 0.2rem;"><i class="fa-solid fa-cart-shopping"></i> Comprar Agora</a>`;
+                }
+            } else if (m.link_compra) {
+                alertBadge = `<a href="${m.link_compra}" target="_blank" style="font-size: 0.75rem; color: var(--text-muted); text-decoration: none; display: inline-block; margin-top: 0.2rem;"><i class="fa-solid fa-link"></i> Link Compra</a>`;
+            }
+
+            listM.innerHTML += `
+                <tr style="${trStyle}">
+                    <td style="padding-left: ${trStyle ? '1rem' : '0.8rem'};">
+                        <strong style="display:block; color:white">${m.nome}</strong>
+                        <span style="font-size:0.8rem; color:var(--text-muted)">Pacote R$ ${m.custo_embalagem.toFixed(2)} (${m.quantidade_embalagem} ${m.unidade}s)</span>
+                        ${alertBadge}
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button onclick="alterarEstoque(${m.id}, 'reduzir')" style="background: var(--surface-border); color: white; border: none; border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer;">-</button>
+                            <span style="font-weight: bold;">${m.quantidade_atual}</span> / <span style="font-size: 0.8em; color: var(--text-muted);">${m.quantidade_minima}</span>
+                            <button onclick="alterarEstoque(${m.id}, 'adicionar')" style="background: var(--surface-border); color: white; border: none; border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer;">+</button>
+                        </div>
+                    </td>
+                    <td><span class="badge-price">R$ ${m.custo_unidade.toFixed(2)} / un</span></td>
+                    <td>
+                        <button onclick="deletarMaterial(${m.id})" class="btn-submit btn-danger" style="padding: 0.3rem 0.6rem; width: auto; margin:0"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // Renderiza Desgastes
+        let listD = document.getElementById('lista-desgastes');
+        listD.innerHTML = '';
+        data.desgastes.forEach(d => {
+            listD.innerHTML += `
+                <tr>
+                    <td>
+                        <strong style="display:block; color:white">${d.nome}</strong>
+                        <span style="font-size:0.8rem; color:var(--text-muted)">Investiu R$ ${d.custo.toFixed(2)} p/ ${d.rendimento} ciclos</span>
+                    </td>
+                    <td><span class="badge-price">R$ ${d.custo_ciclo.toFixed(2)} / ciclo</span></td>
+                    <td>
+                        <button onclick="deletarDesgaste(${d.id})" class="btn-submit btn-danger" style="padding: 0.3rem 0.6rem; width: auto; margin:0"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    async function salvarMaterial() {
+        let payload = {
+            nome: document.getElementById('mat-nome').value,
+            unidade_medida: document.getElementById('mat-un').value,
+            custo_embalagem: document.getElementById('mat-preco').value,
+            quantidade_embalagem: document.getElementById('mat-qtd').value,
+            link_compra: document.getElementById('mat-link').value,
+            quantidade_atual: document.getElementById('mat-estoque-atual').value,
+            quantidade_minima: document.getElementById('mat-estoque-minimo').value
+        };
+        await fetch('/api/materiais', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        document.getElementById('form-material').reset();
+        loadData();
+    }
+
+    async function alterarEstoque(id, acao) {
+        let payload = { acao: acao, quantidade: 1 };
+        await fetch('/api/materiais/' + id + '/estoque', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+        loadData();
+    }
+
+    async function salvarDesgaste() {
+        let payload = {
+            nome: document.getElementById('desg-nome').value,
+            custo: document.getElementById('desg-custo').value,
+            rendimento_ciclos: document.getElementById('desg-ciclos').value
+        };
+        await fetch('/api/desgastes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        document.getElementById('form-desgaste').reset();
+        loadData();
+    }
+
+    async function deletarMaterial(id) {
+        if(confirm("Remover este insumo da base? Não afetará pedidos passados.")) {
+            await fetch('/api/materiais/' + id, {method: 'DELETE'});
+            loadData();
+        }
+    }
+
+    async function deletarDesgaste(id) {
+        if(confirm("Remover este consumível da base?")) {
+            await fetch('/api/desgastes/' + id, {method: 'DELETE'});
+            loadData();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

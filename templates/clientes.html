@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes e CRM | CraftManager{% endblock %}
+
+{% block page_heading %}👥 Base de Clientes (CRM){% endblock %}
+
+{% block head %}
+<style>
+    .split-layout {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 2rem;
+    }
+
+    .form-panel, .list-panel {
+        background: var(--surface-color);
+        border: 1px solid var(--surface-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: var(--text-muted); font-size: 0.9rem;}
+    .form-control {
+        width: 100%; padding: 0.6rem 1rem;
+        background: rgba(0,0,0,0.2); border: 1px solid var(--surface-border);
+        border-radius: 0.5rem; color: white;
+    }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+
+    .btn-submit {
+        background: var(--primary-color); color: white; border: none;
+        padding: 0.6rem 1.2rem; border-radius: 0.5rem; cursor: pointer;
+        font-weight: 500; width: 100%; margin-top: 1rem; transition: 0.3s;
+    }
+    .btn-submit:hover { background: var(--primary-hover); }
+
+    /* Accordion / List Cards */
+    .client-card {
+        background: rgba(0,0,0,0.3);
+        border: 1px solid var(--surface-border);
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .client-header {
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .client-header:hover { background: rgba(99, 102, 241, 0.1); }
+    
+    .client-info-basic h4 { color: white; margin-bottom: 0.2rem; }
+    .client-info-basic p { color: var(--text-muted); font-size: 0.85rem; }
+
+    .badges {
+        display: flex; gap: 0.5rem;
+    }
+    .badge {
+        background: rgba(255,255,255,0.1); padding: 0.2rem 0.6rem;
+        border-radius: 1rem; font-size: 0.75rem; font-weight: 600;
+        color: var(--text-muted);
+    }
+    .badge-ig { background: rgba(225, 48, 108, 0.2); color: #e1306c; }
+
+    .client-details {
+        display: none;
+        padding: 1.5rem;
+        border-top: 1px solid var(--surface-border);
+        background: rgba(255, 255, 255, 0.02);
+    }
+    
+    .client-details.open { display: block; }
+    
+    .det-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .det-item label { display:block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.2rem; }
+    .det-item p { color: white; font-weight: 500; font-size: 0.95rem; }
+
+    .hist-table { width: 100%; border-collapse: collapse; }
+    .hist-table th { text-align: left; font-size: 0.8rem; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:0.5rem;}
+    .hist-table td { padding: 0.75rem 0; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="split-layout">
+    <!-- Cadastro Rápido -->
+    <div class="form-panel">
+        <h3 style="color:var(--primary-color); margin-bottom:1.5rem;"><i class="fa-solid fa-user-plus"></i> Novo Cadastro</h3>
+        
+        <form id="form-cliente" onsubmit="event.preventDefault(); salvarCliente();">
+            <div class="form-group">
+                <label>Nome Completo*</label>
+                <input type="text" class="form-control" id="c-nome" required>
+            </div>
+            
+            <div class="form-group">
+                <label>WhatsApp (Numérico)</label>
+                <input type="text" class="form-control" id="c-zap" placeholder="11999998888">
+            </div>
+
+            <div class="form-group">
+                <label>Instagram / Rede Social</label>
+                <input type="text" class="form-control" id="c-ig" placeholder="@cliente">
+            </div>
+
+            <div style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:1">
+                    <label>Origem (Prospecção)</label>
+                    <select class="form-control" id="c-origem">
+                        <option value="Instagram">Instagram</option>
+                        <option value="WhatsApp">WhatsApp / Indicação</option>
+                        <option value="Shopee/Elo7">Marketplace</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Nascimento</label>
+                    <input type="date" class="form-control" id="c-nasc">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Endereço Completo</label>
+                <textarea class="form-control" id="c-end" placeholder="Rua..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Observações Adicionais</label>
+                <textarea class="form-control" id="c-obs" placeholder="Cliente gosta de coisas em rosa pastel..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-submit">Salvar Contato</button>
+        </form>
+    </div>
+
+    <!-- Lista e Histórico -->
+    <div class="list-panel">
+        <h3 style="color:var(--primary-color); margin-bottom:1.5rem;"><i class="fa-solid fa-users"></i> Carteira de Clientes</h3>
+        
+        <div id="lista-clientes" style="overflow-y:auto; padding-right:0.5rem;">
+            <!-- Renderizado JS -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadClientes() {
+        let res = await fetch('/api/clientes');
+        let data = await res.json();
+        
+        let target = document.getElementById('lista-clientes');
+        target.innerHTML = '';
+
+        data.forEach(c => {
+            let totalGasto = c.historico_pedidos.reduce((acc, curr) => acc + curr.valor_total, 0);
+            
+            // Montar Histórico ROWS
+            let histRows = c.historico_pedidos.map(p => `
+                <tr>
+                    <td>${p.data}</td>
+                    <td>${p.produto}</td>
+                    <td><span class="badge" style="background:rgba(99,102,241,0.2); color:#a5b4fc">${p.fase}</span></td>
+                    <td style="color:var(--success); font-weight:600">R$ ${p.valor_total.toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            target.innerHTML += `
+                <div class="client-card">
+                    <div class="client-header" onclick="toggleDetails(${c.id})">
+                        <div class="client-info-basic">
+                            <h4>${c.nome}</h4>
+                            <p>${c.telefone ? `<i class="fa-brands fa-whatsapp"></i> ${c.telefone}` : 'Sem telefone'} • LTV: <strong style="color:var(--success)">R$ ${totalGasto.toFixed(2)}</strong></p>
+                        </div>
+                        <div class="badges">
+                            ${c.origem ? `<span class="badge">${c.origem}</span>` : ''}
+                            ${c.instagram ? `<span class="badge badge-ig"><i class="fa-brands fa-instagram"></i> ${c.instagram}</span>` : ''}
+                            <i class="fa-solid fa-chevron-down" style="color:var(--text-muted); margin-left:1rem;"></i>
+                        </div>
+                    </div>
+
+                    <div class="client-details" id="det-${c.id}">
+                        <div class="det-grid">
+                            <div class="det-item">
+                                <label>Endereço de Entrega</label>
+                                <p>${c.endereco || 'Não informado'}</p>
+                            </div>
+                            <div class="det-item">
+                                <label>Data de Aniversário</label>
+                                <p>${c.data_nascimento ? c.data_nascimento.split('-').reverse().join('/') : 'Não informado'}</p>
+                            </div>
+                            <div class="det-item" style="grid-column: span 2">
+                                <label>Observações do CRM</label>
+                                <p>${c.observacoes || 'Nenhuma.'}</p>
+                            </div>
+                        </div>
+
+                        <h4 style="margin-bottom:0.8rem; color:var(--text-muted); font-size:0.9rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">Histórico de Aquisições</h4>
+                        ${histRows.length > 0 ? `
+                        <table class="hist-table">
+                            <thead>
+                                <tr><th>Data</th><th>Item Comprado</th><th>Status Kanban</th><th>Valor</th></tr>
+                            </thead>
+                            <tbody>${histRows}</tbody>
+                        </table>
+                        ` : `<p style="color:var(--text-muted); font-size:0.85rem">Sem histórico de pedidos.</p>`}
+
+                        <button onclick="deletar(${c.id})" style="background:transparent; color:var(--danger); border:1px solid var(--danger); padding:0.4rem 1rem; border-radius:0.5rem; margin-top:1.5rem; cursor:pointer">
+                            <i class="fa-solid fa-trash"></i> Excluir Cliente Permanente
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function toggleDetails(id) {
+        let el = document.getElementById(`det-${id}`);
+        el.classList.toggle('open');
+    }
+
+    async function salvarCliente() {
+        let payload = {
+            nome: document.getElementById('c-nome').value,
+            telefone: document.getElementById('c-zap').value,
+            instagram: document.getElementById('c-ig').value,
+            origem: document.getElementById('c-origem').value,
+            data_nascimento: document.getElementById('c-nasc').value,
+            endereco: document.getElementById('c-end').value,
+            observacoes: document.getElementById('c-obs').value
+        };
+
+        await fetch('/api/clientes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        document.getElementById('form-cliente').reset();
+        loadClientes();
+    }
+
+    async function deletar(id) {
+        if(confirm("Excluir contato do banco de dados?")) {
+            let res = await fetch(`/api/clientes/${id}`, {method: 'DELETE'});
+            let data = await res.json();
+            if(data.status === 'error'){
+                alert(data.message); // Protege clientes com finanças pendentes
+            }
+            loadClientes();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadClientes);
+</script>
+{% endblock %}

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orçamento #{{ pedido.id }} - CraftManager</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .document-container {
+            max-width: 800px;
+            background: white;
+            margin: 0 auto;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .company-info h1 { margin: 0; color: #4f46e5; font-size: 24px; }
+        .company-info p { margin: 5px 0 0 0; color: #64748b; font-size: 14px; }
+
+        .doc-meta { text-align: right; }
+        .doc-meta h2 { margin: 0; color: #0f172a; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;}
+        .doc-meta p { margin: 5px 0 0 0; color: #64748b; font-size: 14px; }
+
+        .client-section {
+            background: #f8fafc;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+        }
+        .client-section h3 { margin: 0 0 10px 0; font-size: 14px; color: #64748b; text-transform: uppercase; }
+        .client-section p { margin: 5px 0; font-size: 15px; font-weight: 500; }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .items-table th {
+            text-align: left; background: #f1f5f9; padding: 12px;
+            font-size: 13px; color: #475569; border-bottom: 2px solid #cbd5e1;
+        }
+        .items-table td {
+            padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 15px;
+        }
+
+        .totals-section {
+            display: flex; justify-content: flex-end; margin-bottom: 40px;
+        }
+        .totals-box { width: 300px; }
+        .total-row { display: flex; justify-content: space-between; padding: 8px 0; }
+        .total-row.grand-total {
+            border-top: 2px solid #e2e8f0; font-size: 20px; font-weight: 700; color: #0f172a;
+            margin-top: 8px; padding-top: 12px;
+        }
+
+        .footer-terms {
+            border-top: 1px solid #e2e8f0; padding-top: 20px;
+            font-size: 12px; color: #64748b;
+        }
+        .footer-terms strong { color: #334155; }
+
+        .btn-print {
+            display: block; width: 200px; margin: 20px auto;
+            background: #4f46e5; color: white; border: none; padding: 12px;
+            text-align: center; border-radius: 6px; font-weight: 600; cursor: pointer;
+            text-decoration: none;
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .document-container { box-shadow: none; padding: 0; max-width: 100%; }
+            .btn-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir Orçamento</button>
+
+    <div class="document-container">
+        <div class="header">
+            <div class="company-info">
+                <h1>Ateliê Criativo</h1>
+                <p>Papelaria Personalizada & Design</p>
+            </div>
+            <div class="doc-meta">
+                <h2>Orçamento O.S.</h2>
+                <p>Nº do Documento: <strong>#{{ "%04d" | format(pedido.id) }}</strong></p>
+                <p>Data Base: {{ pedido.data_criacao.strftime('%d/%m/%Y') }}</p>
+            </div>
+        </div>
+
+        <div class="client-section">
+            <h3>Dados do Cliente</h3>
+            <p>Nome: {{ pedido.cliente.nome }}</p>
+            <p>Contato: {% if pedido.cliente.telefone %}{{ pedido.cliente.telefone }}{% else %}Não informado{% endif %}</p>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item / Descrição</th>
+                    <th>Qtd.</th>
+                    <th>V. Unitário</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in pedido.itens %}
+                <tr>
+                    <td>{{ item.nome_item }}</td>
+                    <td>{{ item.quantidade }}</td>
+                    <td>R$ {{ "%.2f"|format(item.valor_unitario) }}</td>
+                    <td><strong>R$ {{ "%.2f"|format(item.valor_subtotal) }}</strong></td>
+                </tr>
+                {% endfor %}
+                {% if not pedido.itens %}
+                <tr>
+                    <td colspan="4" style="text-align:center; color:#94a3b8"><i>Pedido sem itens discriminados. Referência: {{ pedido.descricao_geral }}</i></td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <div class="totals-box">
+                <div class="total-row grand-total">
+                    <span>Total Final</span>
+                    <span>R$ {{ "%.2f"|format(pedido.valor_total) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-terms">
+            <p><strong>Observações do Projeto:</strong> {{ pedido.descricao_geral or "Nenhuma observação." }}</p>
+            <br>
+            <p><strong>Condições Comerciais:</strong></p>
+            <ul style="margin-top:5px; padding-left: 20px;">
+                <li>Forma de Pagamento: {{ pedido.forma_pagamento }}</li>
+                <li>Orçamento válido por: {{ pedido.validade_dias }} dias (até {{ (pedido.data_criacao + execute_python_offset_timedelta(pedido.validade_dias)) if False else 'a data limite' }}).</li>
+                <li>A confecção só é iniciada após o aceite/sinal de pagamento acordado.</li>
+            </ul>
+        </div>
+    </div>
+
+</body>
+</html>

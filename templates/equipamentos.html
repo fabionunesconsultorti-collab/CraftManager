@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Máquinas e Equipamentos | CraftManager{% endblock %}
+
+{% block page_heading %}🖨️ Depreciação de Equipamentos e Plotters{% endblock %}
+
+{% block head %}
+<style>
+    .split-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+
+    .panel {
+        background: var(--surface-color);
+        border: 1px solid var(--surface-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+
+    .section-title {
+        color: var(--primary-color);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: var(--text-muted); font-size: 0.9rem;}
+    .form-control {
+        width: 100%; padding: 0.6rem 1rem;
+        background: rgba(0,0,0,0.2); border: 1px solid var(--surface-border);
+        border-radius: 0.5rem; color: white;
+    }
+
+    .btn-submit {
+        background: var(--primary-color); color: white; border: none;
+        padding: 0.6rem 1.2rem; border-radius: 0.5rem; cursor: pointer;
+        font-weight: 500; width: 100%; margin-top: 1rem; transition: 0.3s;
+    }
+    .btn-submit:hover { background: var(--primary-hover); }
+
+    .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); padding:0.4rem; border-radius:0.5rem; border:none; cursor:pointer;}
+    .btn-danger:hover { background: var(--danger); color: white; }
+
+    .kanban-card {
+        background: rgba(0,0,0,0.3);
+        border: 1px solid var(--surface-border);
+        padding: 1rem; border-radius: 0.75rem; margin-bottom: 0.8rem;
+        display: flex; justify-content: space-between; align-items:center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="split-layout">
+    <!-- CADASTRO MÁQUINA -->
+    <div class="panel">
+        <h3 class="section-title"><i class="fa-solid fa-plus"></i> Registrar Ativo Industrial</h3>
+        <p style="color:var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">O sistema recalculará automaticamente o seu Valor Hora Técnica (VHT) embasado na depreciação real dessas máquinas.</p>
+        
+        <form id="form-equipamento" onsubmit="event.preventDefault(); salvarEquip();">
+            <div class="form-group">
+                <label>Nome do Aparelho (Ex: Silhouette Cameo 5)</label>
+                <input type="text" class="form-control" id="eq-nome" required>
+            </div>
+            
+            <div style="display: flex; gap: 1rem;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Valor Pago Novo (R$)</label>
+                    <input type="number" step="0.01" class="form-control" id="eq-aquisicao" placeholder="3200.00" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Valor p/ Revenda de Sucata (R$)</label>
+                    <input type="number" step="0.01" class="form-control" id="eq-sucata" placeholder="800.00" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Quantos MESES a máquina viverá antes de quebrar? (Vida útil média normal de plotters: 3 a 5 anos = 36 a 60 meses)</label>
+                <input type="number" class="form-control" id="eq-vida" placeholder="48" required>
+            </div>
+
+            <div style="padding:1rem; border:1px solid #4f46e5; border-radius:0.5rem; background:rgba(79, 70, 229, 0.1); margin-top:1rem;">
+                <small style="color:var(--text-muted)">Previsão de Reserva (Depreciação)</small>
+                <h4 id="prev-dep" style="color:#a5b4fc">R$ 0,00 por mês</h4>
+            </div>
+
+            <button type="submit" class="btn-submit">Sincronizar a Calculadora Base</button>
+        </form>
+    </div>
+
+    <!-- LISTA ATIVOS -->
+    <div class="panel">
+        <h3 class="section-title"><i class="fa-solid fa-server"></i> Ativos Atuais em Oficina</h3>
+        <div id="lista-equipamentos" style="max-height: 400px; overflow-y:auto; padding-right:0.5rem;">
+            <!-- Gerado no JS -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadData() {
+        let res = await fetch('/api/equipamentos');
+        let data = await res.json();
+        
+        let container = document.getElementById('lista-equipamentos');
+        container.innerHTML = '';
+        
+        if(data.length === 0){
+            container.innerHTML = `<div style="text-align:center; padding: 2rem; color:var(--text-muted)">Nenhuma máquina castrada no parque industrial.</div>`;
+        }
+
+        data.forEach(eq => {
+            container.innerHTML += `
+                <div class="kanban-card">
+                    <div>
+                        <strong style="color:white; font-size:1.1rem; display:block;">${eq.nome}</strong>
+                        <span style="font-size:0.8rem; color:var(--text-muted)">${eq.vida_util} meses restante • Valor Aquisição: R$ ${eq.aquisicao.toFixed(2)}</span>
+                    </div>
+                    <div style="text-align:right">
+                        <strong style="color:var(--warning); display:block;">R$ ${eq.depreciacao_mensal.toFixed(2)}/mês</strong>
+                        <button onclick="deletar(${eq.id})" class="btn-danger"><i class="fa-solid fa-trash"></i> Baixa</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    async function salvarEquip() {
+        let payload = {
+            nome: document.getElementById('eq-nome').value,
+            valor_aquisicao: document.getElementById('eq-aquisicao').value,
+            valor_residual: document.getElementById('eq-sucata').value,
+            vida_util_meses: document.getElementById('eq-vida').value
+        };
+        await fetch('/api/equipamentos', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        document.getElementById('form-equipamento').reset();
+        document.getElementById('prev-dep').innerText = 'R$ 0,00 por mês';
+        loadData();
+    }
+
+    async function deletar(id) {
+        if(confirm("Confirmar a baixa do equipamento no pátio? Isso afetará sua próxima precificação VHT.")) {
+            await fetch('/api/equipamentos/' + id, {method: 'DELETE'});
+            loadData();
+        }
+    }
+
+    // Calculo Dinamico Visivel na tela
+    document.querySelectorAll('#eq-aquisicao, #eq-sucata, #eq-vida').forEach(el => {
+        el.addEventListener('input', () => {
+            let a = parseFloat(document.getElementById('eq-aquisicao').value) || 0;
+            let s = parseFloat(document.getElementById('eq-sucata').value) || 0;
+            let v = parseInt(document.getElementById('eq-vida').value) || 1;
+            
+            if(v > 0) {
+                let dep = (a - s) / v;
+                document.getElementById('prev-dep').innerText = `R$ ${dep.toFixed(2)} por mês`;
+            }
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Engenharia de Custos | CraftManager{% endblock %}
+
+{% block page_heading %}⚙️ Engenharia e Cálculo Base (VHT){% endblock %}
+
+{% block head %}
+<style>
+    .grid-engenharia {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .card-resumo {
+        padding: 1.5rem;
+        border-radius: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .card-resumo.destaque {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #8b5cf6 100%);
+        color: white;
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+    }
+    
+    .card-resumo h3 { font-size: 1rem; opacity: 0.9; }
+    .card-resumo .valor { font-size: 2.2rem; font-weight: 700; }
+    .card-resumo .sub-info { font-size: 0.8rem; opacity: 0.8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="grid-engenharia">
+    <!-- Bloco Principal -->
+    <div class="card-resumo destaque">
+        <h3><i class="fa-solid fa-stopwatch"></i> Seu Valor / Hora Técnica (VHT)</h3>
+        <div class="valor" id="val-vht">R$ 0,00</div>
+        <div class="sub-info">Custo exato de cada 1h "respirando" na fabriqueta.</div>
+    </div>
+    
+    <!-- Bloco Despesas -->
+    <div class="card-resumo glass-effect">
+        <h3>Despesas + Pró-Labore Mês</h3>
+        <div class="valor" id="val-fixo" style="color: var(--danger)">R$ 0,00</div>
+        <div class="sub-info">Meta de faturamento inicial (Ponto de Equilíbrio base)</div>
+    </div>
+    
+    <!-- Bloco Depreciação -->
+    <div class="card-resumo glass-effect">
+        <h3>Depreciação de Máquinas Caixa</h3>
+        <div class="valor" id="val-depreciacao" style="color: var(--warning)">R$ 0,00</div>
+        <div class="sub-info">Quanto precisa poupar por mês para repor máquinas</div>
+    </div>
+</div>
+
+<div class="glass-effect" style="margin-top: 2rem; padding: 2rem; border-radius: 1rem;">
+    <h2>Análise de Operação e Eficiência</h2>
+    <p style="margin-top: 1rem; color: var(--text-muted); line-height: 1.6">
+        Seu VHT é o coração da sua precificação. Nunca cobre menos que o seu custo proporcional de mão de obra. 
+        Este painel já carregou as configurações base do sistema e todas as suas máquinas cadastradas 
+        (Silhouette, Impressoras Epson) extraindo a depreciação correta.
+    </p>
+    <br>
+    <p style="color: var(--text-muted); line-height: 1.6">
+        <strong>Fórmula Aplicada:</strong> (Custo Fixo + Pró-Labore + Depreciação Linear) ÷ (Jornada Mensal × Eficiência (80%)) = <span style="color: white; font-weight: bold;">VHT</span>
+    </p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        fetch('/api/engenharia/vht')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('val-vht').innerText = 'R$ ' + data.vht_calculado.toFixed(2).replace('.', ',');
+                document.getElementById('val-fixo').innerText = 'R$ ' + data.total_fixo.toFixed(2).replace('.', ',');
+                document.getElementById('val-depreciacao').innerText = 'R$ ' + data.total_depreciacao.toFixed(2).replace('.', ',');
+            })
+            .catch(err => console.error("Falha ao puxar engenharia", err));
+    });
+</script>
+{% endblock %}

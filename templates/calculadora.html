@@ -180,8 +180,12 @@
     async function loadConfig() {
         let res = await fetch('/api/engenharia/vht');
         let data = await res.json();
-        VHT = data.vht_calculado; // Valor Hora Tecnica
-        document.getElementById('info-vht').innerText = `R$ ${VHT.toFixed(2).replace('.',',')} por hora`;
+        VHT = data.vht_calculado || 0; // Valor Hora Tecnica
+        if (data.erro) {
+            document.getElementById('info-vht').innerHTML = `<span style="color:var(--danger)"><i class="fa-solid fa-triangle-exclamation"></i> Configure a tela de Engenharia de Custos primeiro!</span>`;
+        } else {
+            document.getElementById('info-vht').innerText = `R$ ${VHT.toFixed(2).replace('.',',')} por hora`;
+        }
 
         // Busca o catalogo
         res = await fetch('/api/catalogo_calculos');
@@ -192,7 +196,7 @@
         catalogoMateriais.forEach(item => {
             let opt = document.createElement('option');
             opt.value = item.id;
-            opt.innerText = item.nome + ` (R$ ${item.custo_unidade ? item.custo_unidade.toFixed(2) : item.custo_ciclo.toFixed(2)})`;
+            opt.innerText = item.nome + ` (R$ ${item.custo_unidade !== undefined ? item.custo_unidade.toFixed(2) : item.custo_ciclo.toFixed(2)})`;
             target.appendChild(opt);
         });
         calcularTudo();

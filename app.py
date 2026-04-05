@@ -75,7 +75,7 @@ def calcular_vht():
     # 2. Despesas Fixas e Depreciação
     despesas_fixas = sum([c.valor_mensal for c in CustoFixo.query.all()])
     equipamentos = Equipamento.query.all()
-    depreciacao_mensal = sum([(e.valor_aquisicao - e.valor_residual) / e.vida_util_meses for e in equipamentos])
+    depreciacao_mensal = sum([(e.valor_aquisicao - e.valor_residual) / e.vida_util_meses if e.vida_util_meses else 0 for e in equipamentos])
     
     total_custos_mes = despesas_fixas + config.pro_labore + depreciacao_mensal
     
@@ -97,7 +97,7 @@ def calcular_vht():
 def api_equipamentos():
     if request.method == 'GET':
         eqs = Equipamento.query.all()
-        return jsonify([{"id": e.id, "nome": e.nome, "aquisicao": e.valor_aquisicao, "vida_util": e.vida_util_meses, "residual": e.valor_residual, "depreciacao_mensal": (e.valor_aquisicao - e.valor_residual)/e.vida_util_meses} for e in eqs])
+        return jsonify([{"id": e.id, "nome": e.nome, "aquisicao": e.valor_aquisicao, "vida_util": e.vida_util_meses, "residual": e.valor_residual, "depreciacao_mensal": (e.valor_aquisicao - e.valor_residual) / e.vida_util_meses if e.vida_util_meses else 0} for e in eqs])
     else:
         data = request.json
         e = Equipamento(
@@ -120,8 +120,8 @@ def del_equipamento(eq_id):
 # Rota para carregar informações necessárias para calculadora
 @app.route('/api/catalogo_calculos', methods=['GET'])
 def catalogo_calculos():
-    materiais = [{"id": m.id, "nome": m.nome, "custo_unidade": m.custo_embalagem / m.quantidade_embalagem, "custo_embalagem": m.custo_embalagem, "quantidade_embalagem": m.quantidade_embalagem, "unidade": m.unidade_medida, "link_compra": m.link_compra, "quantidade_minima": m.quantidade_minima, "quantidade_atual": m.quantidade_atual} for m in Material.query.all()]
-    desgastes = [{"id": d.id, "nome": d.nome, "custo_ciclo": d.custo / d.rendimento_ciclos, "custo": d.custo, "rendimento": d.rendimento_ciclos} for d in Desgaste.query.all()]
+    materiais = [{"id": m.id, "nome": m.nome, "custo_unidade": (m.custo_embalagem / m.quantidade_embalagem) if m.quantidade_embalagem else 0, "custo_embalagem": m.custo_embalagem, "quantidade_embalagem": m.quantidade_embalagem, "unidade": m.unidade_medida, "link_compra": m.link_compra, "quantidade_minima": m.quantidade_minima, "quantidade_atual": m.quantidade_atual} for m in Material.query.all()]
+    desgastes = [{"id": d.id, "nome": d.nome, "custo_ciclo": (d.custo / d.rendimento_ciclos) if d.rendimento_ciclos else 0, "custo": d.custo, "rendimento": d.rendimento_ciclos} for d in Desgaste.query.all()]
     return jsonify({"materiais": materiais, "desgastes": desgastes})
 
 def allowed_file(filename):
@@ -413,4 +413,4 @@ def atualizar_fase_pedido(pedido_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)

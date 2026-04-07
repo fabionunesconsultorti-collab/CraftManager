@@ -1,7 +1,12 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from database import db
 from models import Cliente, Material, CustoFixo, Produto, Pedido, ConfiguracaoOperacional, Equipamento, Desgaste, ProdutoMaterial, ProdutoImagem
 import os
+import zipfile
+import io
+import shutil
+import tempfile
+from datetime import datetime
 from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gerencia.db'
@@ -63,6 +68,76 @@ def calculadora_produto():
 @app.route('/materiais')
 def gerenciar_materiais():
     return render_template('materiais.html')
+
+@app.route('/manutencao')
+def manutencao():
+    return render_template('manutencao.html')
+
+# Rotas API Manutenção / Backup
+@app.route('/api/backup/download', methods=['GET'])
+def download_backup():
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Salvando o banco de dados
+        db_path = os.path.join(app.instance_path, 'gerencia.db')
+        if os.path.exists(db_path):
+            zf.write(db_path, 'gerencia.db')
+            
+        # Salvando as imagens (se existirem)
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+            for root, dirs, files in os.walk(app.config['UPLOAD_FOLDER']):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.join('uploads', os.path.relpath(file_path, app.config['UPLOAD_FOLDER']))
+                    zf.write(file_path, arcname)
+                    
+    memory_file.seek(0)
+    data_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return send_file(memory_file, download_name=f'backup_craftmanager_{data_hora}.zip', as_attachment=True)
+
+@app.route('/api/backup/restore', methods=['POST'])
+def restore_backup():
+    if 'backup_file' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+        
+    file = request.files['backup_file']
+    if file.filename == '':
+        return jsonify({"erro": "Arquivo não selecionado"}), 400
+        
+    if not file.filename.endswith('.zip'):
+        return jsonify({"erro": "O arquivo deve ter extensão .zip"}), 400
+        
+    try:
+        temp_dir = tempfile.mkdtemp()
+        temp_zip_path = os.path.join(temp_dir, 'backup.zip')
+        file.save(temp_zip_path)
+        
+        with zipfile.ZipFile(temp_zip_path, 'r') as zf:
+            zf.extractall(temp_dir)
+            
+        # Restaura Database
+        extracted_db = os.path.join(temp_dir, 'gerencia.db')
+        if os.path.exists(extracted_db):
+            os.makedirs(app.instance_path, exist_ok=True)
+            db_dest = os.path.join(app.instance_path, 'gerencia.db')
+            shutil.copy2(extracted_db, db_dest)
+            
+        # Restaura Imagens
+        extracted_uploads = os.path.join(temp_dir, 'uploads')
+        if os.path.exists(extracted_uploads):
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            for item in os.listdir(extracted_uploads):
+                s = os.path.join(extracted_uploads, item)
+                d = os.path.join(app.config['UPLOAD_FOLDER'], item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
+                    
+        shutil.rmtree(temp_dir)
+        return jsonify({"status": "success", "mensagem": "Sistema restaurado com sucesso!"})
+    except Exception as e:
+        return jsonify({"erro": f"Erro interno ao restaurar: {str(e)}"}), 500
 
 # Rotas API (Para uso dinamico com JS)
 @app.route('/api/engenharia/vht', methods=['GET'])

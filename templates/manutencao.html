@@ -49,6 +49,27 @@
     </div>
 </div>
 
+<!-- Card do Atualizador do Github (Horizontal Block) -->
+<div class="glass-effect" style="padding: 2rem; border-radius: 1rem; border: 1px solid rgba(99, 102, 241, 0.4); margin-top: 2rem;">
+    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+        <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(99, 102, 241, 0.1); color: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <i class="fa-brands fa-github"></i>
+        </div>
+        <div>
+            <h2 style="margin: 0; font-size: 1.5rem;">Sincronizar Atualizações do Sistema</h2>
+            <span style="color: var(--primary-light); font-size: 0.9rem;">(Auto-Updater Inteligente via GitHub)</span>
+        </div>
+    </div>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+        Baixe instantaneamente as atualizações mais recentes do código diretamente das nuvens sem abrir o terminal de comandos do aparelho. <br>
+        O seu Banco de Dados local e seu portfólio de imagens já estão bloqueados pelas instruções de segurança e não serão apagados.
+    </p>
+
+    <button id="btnGitUpdater" class="btn" style="background: var(--bg-color); border: 1px solid #6366f1; color: white; width: 100%; justify-content: center; padding: 1rem; font-size: 1.1rem; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='#6366f1'" onmouseout="this.style.background='var(--bg-color)'">
+        <i class="fa-solid fa-cloud-arrow-down"></i> Puxar a Versão mais Recente do GitHub
+    </button>
+</div>
+
 <style>
 @media (max-width: 768px) {
     .dashboard-grid {
@@ -122,6 +143,35 @@ document.addEventListener('DOMContentLoaded', () => {
             btnRestore.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Restaurar Agora';
         }
     });
+
+    const btnUpdater = document.getElementById('btnGitUpdater');
+    if(btnUpdater){
+        btnUpdater.addEventListener('click', async () => {
+            if(!confirm("Deseja iniciar download das atualizações de Código mais recentes e substituir o seu sistema operacional local pelo que está no GitHub?")) {
+                return;
+            }
+            btnUpdater.disabled = true;
+            btnUpdater.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando Arquivos...';
+            
+            try {
+                const response = await fetch('/api/backup/update-system', { method: 'POST' });
+                const data = await response.json();
+                
+                if(response.ok) {
+                    alert(`${data.mensagem}\n\n[LOG DO GITHUB]:\n${data.log}`);
+                    window.location.reload();
+                } else {
+                    alert(`Ocorreu um erro!\n${data.erro}\n\n[ERRO REPORTADO PELA MÁQUINA]:\n${data.log}`);
+                    btnUpdater.disabled = false;
+                    btnUpdater.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Puxar a Versão mais Recente do GitHub';
+                }
+            } catch (error) {
+                alert("Comunicação Crítica Interrompida com o Servidor ao tentar Sincronizar via Git.");
+                btnUpdater.disabled = false;
+                btnUpdater.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Puxar a Versão mais Recente do GitHub';
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

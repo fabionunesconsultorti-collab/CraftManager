@@ -6,6 +6,7 @@ import zipfile
 import io
 import shutil
 import tempfile
+import subprocess
 from datetime import datetime
 from werkzeug.utils import secure_filename
 app = Flask(__name__)
@@ -138,6 +139,19 @@ def restore_backup():
         return jsonify({"status": "success", "mensagem": "Sistema restaurado com sucesso!"})
     except Exception as e:
         return jsonify({"erro": f"Erro interno ao restaurar: {str(e)}"}), 500
+
+@app.route('/api/backup/update-system', methods=['POST'])
+def update_system_git():
+    try:
+        # Comando para baixar a versao da main invisivelmente
+        result = subprocess.run(['git', 'pull', 'origin', 'main'], capture_output=True, text=True, cwd=app.root_path)
+        
+        if result.returncode == 0:
+            return jsonify({"status": "success", "mensagem": "Aplicativo sincronizado e atualizado via Git!", "log": result.stdout})
+        else:
+            return jsonify({"erro": f"Git retornou código de falha ({result.returncode})", "log": result.stderr}), 500
+    except Exception as e:
+        return jsonify({"erro": f"Falha de comunicação OS terminal: {str(e)}"}), 500
 
 # Rotas API (Para uso dinamico com JS)
 @app.route('/api/engenharia/vht', methods=['GET'])

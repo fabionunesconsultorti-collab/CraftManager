@@ -49,6 +49,16 @@
     .radio-card.active {
         background: rgba(99, 102, 241, 0.1); border-color: var(--primary-color); color: white;
     }
+
+    @media (max-width: 768px) {
+        .order-layout { grid-template-columns: 1fr; gap: 1.5rem; margin-top: 1rem; }
+        .panel { padding: 1rem; }
+        .radio-group { flex-direction: column; gap: 0.5rem; }
+        /* Forçando elementos Inline-Flex para modelo Coluna */
+        .panel div[style*="display:flex"] { flex-direction: column !important; align-items: stretch !important; gap: 0.5rem !important; }
+        .panel div[style*="align-items:end"] { align-items: stretch !important; }
+        .btn-submit[style*="width:auto"] { width: 100% !important; margin-top: 1rem; }
+    }
 </style>
 {% endblock %}
 

@@ -74,6 +74,16 @@
         color: var(--success);
         margin: 1rem 0;
     }
+
+    @media (max-width: 768px) {
+        .calc-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+        .panel { padding: 1rem; }
+        .row { flex-direction: column; gap: 0.5rem; }
+        .col.form-group[style*="max-width"] { max-width: 100% !important; }
+        .form-control { font-size: 0.95rem; }
+        .result-box { padding: 1rem; }
+        .result-price { font-size: 2.2rem; }
+    }
 </style>
 {% endblock %}
 

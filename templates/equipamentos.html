@@ -51,6 +51,15 @@
         padding: 1rem; border-radius: 0.75rem; margin-bottom: 0.8rem;
         display: flex; justify-content: space-between; align-items:center;
     }
+
+    @media (max-width: 768px) {
+        .split-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+        .panel { padding: 1rem; }
+        div[style*="display: flex; gap: 1rem;"] { flex-direction: column; gap: 0.5rem; }
+        .kanban-card { flex-direction: column; align-items: stretch; gap: 1rem; text-align: left; }
+        .kanban-card > div[style*="text-align:right"] { text-align: left !important; margin-top: 0.5rem; }
+        .btn-danger { width: 100%; margin-top: 0.5rem; text-align: center; }
+    }
 </style>
 {% endblock %}
 

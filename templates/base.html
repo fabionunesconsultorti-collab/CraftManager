@@ -11,7 +11,10 @@
 </head>
 <body>
     <div class="app-layout">
-        <nav class="sidebar glass-effect">
+        <!-- Overlay For Mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <nav class="sidebar glass-effect" id="mainSidebar">
             <div class="logo">
                 <i class="fa-solid fa-shapes"></i>
                 <h2>CraftManager</h2>
@@ -34,7 +37,8 @@
 
         <main class="main-content">
             <header class="top-header glass-effect">
-                <div class="breadcrumb">
+                <div class="breadcrumb" style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="menu-toggle" id="menuToggle"><i class="fa-solid fa-bars"></i></button>
                     <h1>{% block page_heading %}Painel{% endblock %}</h1>
                 </div>
                 <div class="user-profile">
@@ -59,6 +63,23 @@
                     item.classList.add('active');
                 }
             });
+
+            // Mobile Sidebar Toggle Logic
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.getElementById('mainSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if(menuToggle && sidebar && overlay) {
+                menuToggle.addEventListener('click', () => {
+                    sidebar.classList.add('open');
+                    overlay.classList.add('active');
+                });
+
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                });
+            }
         });
     </script>
     {% block scripts %}{% endblock %}

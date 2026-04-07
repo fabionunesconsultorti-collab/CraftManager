@@ -296,3 +296,79 @@ body {
     text-align: center;
     color: var(--text-muted);
 }
+
+/* Mobile Responsiveness Components */
+.menu-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 20;
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 8;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .menu-toggle {
+        display: block;
+    }
+    
+    .sidebar {
+        position: fixed;
+        left: -300px;
+        transition: left 0.3s ease;
+        background: var(--bg-color); /* solid so things don't bleed through heavily */
+        height: 100vh;
+        z-index: 99;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+    }
+    
+    .sidebar.open {
+        left: 0;
+    }
+
+    .top-header {
+        padding: 0 1rem;
+        gap: 1rem;
+    }
+
+    .breadcrumb h1 {
+        font-size: 1.1rem;
+    }
+
+    .content-wrapper {
+        padding: 1rem;
+    }
+
+    .kanban-board {
+        gap: 1rem;
+    }
+
+    .kanban-column {
+        min-width: 260px;
+        max-width: 260px;
+    }
+    
+    /* Global form elements */
+    input, select, textarea, button {
+        max-width: 100%;
+    }
+}

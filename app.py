@@ -488,4 +488,5 @@ def atualizar_fase_pedido(pedido_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+    # Permitindo acesso pela rede local via host '0.0.0.0'
     app.run(host='0.0.0.0', debug=True, port=5000)

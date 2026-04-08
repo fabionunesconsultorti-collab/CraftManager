@@ -130,7 +130,7 @@
                 </div>
             </div>
 
-            <button type="submit" class="btn-submit">Registrar Insumo</button>
+            <button type="submit" class="btn btn-full">Registrar Insumo</button>
         </form>
     </div>
 
@@ -178,7 +178,7 @@
                 </div>
             </div>
 
-            <button type="submit" class="btn-submit">Registrar Desgaste</button>
+            <button type="submit" class="btn btn-full">Registrar Desgaste</button>
         </form>
     </div>
 
@@ -243,14 +243,14 @@
                     </td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <button onclick="alterarEstoque(${m.id}, 'reduzir')" style="background: var(--surface-border); color: white; border: none; border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer;">-</button>
+                            <button onclick="alterarEstoque(${m.id}, 'reduzir')" class="btn btn-ghost btn-sm">-</button>
                             <span style="font-weight: bold;">${m.quantidade_atual}</span> / <span style="font-size: 0.8em; color: var(--text-muted);">${m.quantidade_minima}</span>
-                            <button onclick="alterarEstoque(${m.id}, 'adicionar')" style="background: var(--surface-border); color: white; border: none; border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer;">+</button>
+                            <button onclick="alterarEstoque(${m.id}, 'adicionar')" class="btn btn-ghost btn-sm">+</button>
                         </div>
                     </td>
                     <td><span class="badge-price">R$ ${m.custo_unidade.toFixed(2)} / un</span></td>
                     <td>
-                        <button onclick="deletarMaterial(${m.id})" class="btn-submit btn-danger" style="padding: 0.3rem 0.6rem; width: auto; margin:0"><i class="fa-solid fa-trash"></i></button>
+                        <button onclick="deletarMaterial(${m.id})" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>
             `;
@@ -268,7 +268,7 @@
                     </td>
                     <td><span class="badge-price">R$ ${d.custo_ciclo.toFixed(2)} / ciclo</span></td>
                     <td>
-                        <button onclick="deletarDesgaste(${d.id})" class="btn-submit btn-danger" style="padding: 0.3rem 0.6rem; width: auto; margin:0"><i class="fa-solid fa-trash"></i></button>
+                        <button onclick="deletarDesgaste(${d.id})" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>
             `;

@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash
 from database import db
-from models import Cliente, Material, CustoFixo, Produto, Pedido, ConfiguracaoOperacional, Equipamento, Desgaste, ProdutoMaterial, ProdutoImagem
+from models import Cliente, Material, CustoFixo, Produto, Pedido, ConfiguracaoOperacional, Equipamento, Desgaste, ProdutoMaterial, ProdutoImagem, Usuario, ConfiguracaoVisual
 import os
 import zipfile
 import io
@@ -8,8 +8,11 @@ import shutil
 import tempfile
 import subprocess
 from datetime import datetime
+from functools import wraps
 from werkzeug.utils import secure_filename
+
 app = Flask(__name__)
+app.secret_key = 'craftmanager_secret_super_key_123'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gerencia.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -19,63 +22,130 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db.init_app(app)
 
+# Injeção global de configurações visuais em todos os templates
+@app.context_processor
+def inject_visual_config():
+    config = ConfiguracaoVisual.query.first()
+    if not config:
+        config = ConfiguracaoVisual()
+        db.session.add(config)
+        db.session.commit()
+    return dict(visual_config=config)
+
+IDENTIDADE_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads/identidade')
+os.makedirs(IDENTIDADE_FOLDER, exist_ok=True)
+app.config['IDENTIDADE_FOLDER'] = IDENTIDADE_FOLDER
+
+def role_required(min_level):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('login', next=request.url))
+            
+            user_role = session.get('role', 'Usuário')
+            role_map = {'Usuário': 1, 'Gerente': 2, 'Administrador': 3}
+            current_level = role_map.get(user_role, 1)
+            
+            if current_level < min_level:
+                if request.path.startswith('/api/'):
+                    return jsonify({"erro": "Acesso negado para o seu perfil."}), 403
+                return render_template('dashboard.html', erro_acesso="Acesso negado para o seu nível hierárquico.")
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = Usuario.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['role'] = user.role
+            return redirect(url_for('dashboard'))
+        else:
+            return render_template('login.html', erro="Credenciais inválidas")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 # Rotas Web (Frontend)
 @app.route('/')
+@role_required(1)
 def dashboard():
     return render_template('dashboard.html')
 
 @app.route('/novo-pedido')
+@role_required(1)
 def novo_pedido():
     return render_template('novo_pedido.html')
 
 @app.route('/orcamento/<int:pedido_id>')
+@role_required(1)
 def visualizar_orcamento(pedido_id):
     pedido = Pedido.query.get_or_404(pedido_id)
     return render_template('orcamento.html', pedido=pedido)
 
 @app.route('/kanban')
+@role_required(1)
 def kanban():
     return render_template('kanban.html')
 
 @app.route('/pedidos')
+@role_required(1)
 def gerenciar_pedidos():
     return render_template('pedidos.html')
 
 @app.route('/recibo/<int:pedido_id>')
+@role_required(1)
 def visualizar_recibo(pedido_id):
     pedido = Pedido.query.get_or_404(pedido_id)
     return render_template('recibo.html', pedido=pedido)
 
 @app.route('/clientes')
+@role_required(1)
 def gerenciar_clientes():
     return render_template('clientes.html')
 
 @app.route('/produtos')
+@role_required(2)
 def gerenciar_produtos():
     return render_template('produtos.html')
 
 @app.route('/engenharia-custos')
+@role_required(3)
 def engenharia_custos():
     return render_template('engenharia.html')
 
 @app.route('/equipamentos')
+@role_required(2)
 def gerenciar_equipamentos():
     return render_template('equipamentos.html')
 
 @app.route('/calculadora-produto')
+@role_required(2)
 def calculadora_produto():
     return render_template('calculadora.html')
 
 @app.route('/materiais')
+@role_required(2)
 def gerenciar_materiais():
     return render_template('materiais.html')
 
 @app.route('/manutencao')
+@role_required(3)
 def manutencao():
     return render_template('manutencao.html')
 
 # Rotas API Manutenção / Backup
 @app.route('/api/backup/download', methods=['GET'])
+@role_required(3)
 def download_backup():
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -97,6 +167,7 @@ def download_backup():
     return send_file(memory_file, download_name=f'backup_craftmanager_{data_hora}.zip', as_attachment=True)
 
 @app.route('/api/backup/restore', methods=['POST'])
+@role_required(3)
 def restore_backup():
     if 'backup_file' not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
@@ -141,6 +212,7 @@ def restore_backup():
         return jsonify({"erro": f"Erro interno ao restaurar: {str(e)}"}), 500
 
 @app.route('/api/backup/update-system', methods=['POST'])
+@role_required(3)
 def update_system_git():
     try:
         # Comando para baixar a versao da main invisivelmente
@@ -155,6 +227,7 @@ def update_system_git():
 
 # Rotas API (Para uso dinamico com JS)
 @app.route('/api/engenharia/vht', methods=['GET'])
+@role_required(3)
 def calcular_vht():
     # 1. Busca configurações essenciais
     config = ConfiguracaoOperacional.query.first()
@@ -166,7 +239,7 @@ def calcular_vht():
     equipamentos = Equipamento.query.all()
     depreciacao_mensal = sum([(e.valor_aquisicao - e.valor_residual) / e.vida_util_meses if e.vida_util_meses else 0 for e in equipamentos])
     
-    total_custos_mes = despesas_fixas + config.pro_labore + depreciacao_mensal
+    total_custos_mes = despesas_fixas + config.pro_labore + depreciacao_mensal + (config.previsao_energia_mensal or 0)
     
     # 3. Horas Produtivas
     horas_mes = config.dias_trabalhados * config.horas_por_dia
@@ -177,12 +250,176 @@ def calcular_vht():
     return jsonify({
         "vht_calculado": round(vht, 2),
         "total_depreciacao": round(depreciacao_mensal, 2),
-        "total_fixo": round(despesas_fixas + config.pro_labore, 2),
+        "total_fixo": round(despesas_fixas + config.pro_labore + (config.previsao_energia_mensal or 0), 2),
         "horas_produtivas": round(horas_produtivas, 2)
     })
 
+# Rotas de Gestão de Usuários
+@app.route('/api/usuarios', methods=['GET', 'POST'])
+@role_required(3)
+def api_usuarios():
+    if request.method == 'GET':
+        users = Usuario.query.all()
+        return jsonify([{"id": u.id, "username": u.username, "role": u.role} for u in users])
+    else:
+        data = request.json
+        if Usuario.query.filter_by(username=data['username']).first():
+            return jsonify({"erro": "Usuário já existe"}), 400
+        
+        user = Usuario(username=data['username'], role=data['role'])
+        user.set_password(data['password'])
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({"status": "success"})
+
+@app.route('/api/usuarios/<int:user_id>', methods=['DELETE'])
+@role_required(3)
+def del_usuario(user_id):
+    if user_id == session.get('user_id'):
+        return jsonify({"erro": "Você não pode excluir a si mesmo"}), 400
+    user = Usuario.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+@app.route('/api/usuarios/<int:user_id>/reset-password', methods=['POST'])
+@role_required(3)
+def reset_password(user_id):
+    data = request.json
+    user = Usuario.query.get_or_404(user_id)
+    user.set_password(data['new_password'])
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+# Rotas de Configurações do Negócio
+@app.route('/api/configuracoes', methods=['GET'])
+@role_required(2)
+def get_configuracoes():
+    config = ConfiguracaoOperacional.query.first()
+    custos_fixos = CustoFixo.query.all()
+    
+    if not config:
+        config = ConfiguracaoOperacional()
+        db.session.add(config)
+        db.session.commit()
+
+    return jsonify({
+        "operacional": {
+            "dias_trabalhados": config.dias_trabalhados,
+            "horas_por_dia": config.horas_por_dia,
+            "eficiencia_percentual": config.eficiencia_percentual,
+            "pro_labore": config.pro_labore,
+            "previsao_energia_mensal": config.previsao_energia_mensal
+        },
+        "custos_fixos": [{"id": c.id, "descricao": c.descricao, "valor_mensal": c.valor_mensal} for c in custos_fixos]
+    })
+
+@app.route('/api/configuracoes/operacional', methods=['POST'])
+@role_required(3)
+def update_config_operacional():
+    data = request.json
+    config = ConfiguracaoOperacional.query.first()
+    if not config:
+        config = ConfiguracaoOperacional()
+        db.session.add(config)
+    
+    config.dias_trabalhados = int(data.get('dias_trabalhados', 22))
+    config.horas_por_dia = int(data.get('horas_por_dia', 8))
+    config.eficiencia_percentual = float(data.get('eficiencia_percentual', 80.0))
+    config.pro_labore = float(data.get('pro_labore', 2500.0))
+    config.previsao_energia_mensal = float(data.get('previsao_energia_mensal', 0.0))
+    
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+@app.route('/api/configuracoes/custo-fixo', methods=['POST'])
+@role_required(3)
+def add_custo_fixo():
+    data = request.json
+    novo_custo = CustoFixo(
+        descricao=data['descricao'],
+        valor_mensal=float(data['valor_mensal'])
+    )
+    db.session.add(novo_custo)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+@app.route('/api/configuracoes/custo-fixo/<int:custo_id>', methods=['DELETE'])
+@role_required(3)
+def del_custo_fixo(custo_id):
+    custo = CustoFixo.query.get_or_404(custo_id)
+    db.session.delete(custo)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+# Rotas de Identidade Visual
+@app.route('/api/configuracoes/visual', methods=['GET', 'POST'])
+@role_required(2)
+def handle_config_visual():
+    config = ConfiguracaoVisual.query.first()
+    if not config:
+        config = ConfiguracaoVisual()
+        db.session.add(config)
+        db.session.commit()
+
+    if request.method == 'GET':
+        return jsonify({
+            "nome_empresa": config.nome_empresa,
+            "cor_primaria": config.cor_primaria,
+            "cor_secundaria": config.cor_secundaria,
+            "cor_fundo": config.cor_fundo,
+            "fonte_principal": config.fonte_principal,
+            "logo_path": config.logo_path,
+            "favicon_path": config.favicon_path
+        })
+    else:
+        # Administrador apenas para salvar
+        if session.get('role') != 'Administrador':
+            return jsonify({"erro": "Apenas administradores podem alterar a identidade visual"}), 403
+            
+        data = request.json
+        config.nome_empresa = data.get('nome_empresa', config.nome_empresa)
+        config.cor_primaria = data.get('cor_primaria', config.cor_primaria)
+        config.cor_secundaria = data.get('cor_secundaria', config.cor_secundaria)
+        config.cor_fundo = data.get('cor_fundo', config.cor_fundo)
+        config.fonte_principal = data.get('fonte_principal', config.fonte_principal)
+        
+        db.session.commit()
+        return jsonify({"status": "success"})
+
+@app.route('/api/configuracoes/upload-identidade', methods=['POST'])
+@role_required(3)
+def upload_identidade():
+    config = ConfiguracaoVisual.query.first()
+    tipo = request.form.get('tipo') # 'logo' ou 'favicon'
+    
+    if 'arquivo' not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+        
+    file = request.files['arquivo']
+    if file.filename == '':
+        return jsonify({"erro": "Arquivo não selecionado"}), 400
+        
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        # Prefixo para evitar conflitos e manter organizado
+        unique_name = f"{tipo}_{filename}"
+        save_path = os.path.join(app.config['IDENTIDADE_FOLDER'], unique_name)
+        file.save(save_path)
+        
+        if tipo == 'logo':
+            config.logo_path = unique_name
+        else:
+            config.favicon_path = unique_name
+            
+        db.session.commit()
+        return jsonify({"status": "success", "path": unique_name})
+    
+    return jsonify({"erro": "Tipo de arquivo não permitido"}), 400
+
 # Rota Equipamentos CRUD
 @app.route('/api/equipamentos', methods=['GET', 'POST'])
+@role_required(2)
 def api_equipamentos():
     if request.method == 'GET':
         eqs = Equipamento.query.all()
@@ -200,6 +437,7 @@ def api_equipamentos():
         return jsonify({"status": "success"})
 
 @app.route('/api/equipamentos/<int:eq_id>', methods=['DELETE'])
+@role_required(2)
 def del_equipamento(eq_id):
     e = Equipamento.query.get_or_404(eq_id)
     db.session.delete(e)
@@ -208,6 +446,7 @@ def del_equipamento(eq_id):
 
 # Rota para carregar informações necessárias para calculadora
 @app.route('/api/catalogo_calculos', methods=['GET'])
+@role_required(2)
 def catalogo_calculos():
     materiais = [{"id": m.id, "nome": m.nome, "custo_unidade": (m.custo_embalagem / m.quantidade_embalagem) if m.quantidade_embalagem else 0, "custo_embalagem": m.custo_embalagem, "quantidade_embalagem": m.quantidade_embalagem, "unidade": m.unidade_medida, "link_compra": m.link_compra, "quantidade_minima": m.quantidade_minima, "quantidade_atual": m.quantidade_atual} for m in Material.query.all()]
     desgastes = [{"id": d.id, "nome": d.nome, "custo_ciclo": (d.custo / d.rendimento_ciclos) if d.rendimento_ciclos else 0, "custo": d.custo, "rendimento": d.rendimento_ciclos} for d in Desgaste.query.all()]
@@ -217,6 +456,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'webp'}
 
 @app.route('/api/produtos', methods=['GET', 'POST'])
+@role_required(2)
 def handle_produtos():
     if request.method == 'GET':
         prods = Produto.query.all()
@@ -268,6 +508,7 @@ def handle_produtos():
         return jsonify({"status": "success", "id": p.id})
 
 @app.route('/api/produtos/<int:prod_id>', methods=['DELETE'])
+@role_required(1)
 def del_produto(prod_id):
     p = Produto.query.get_or_404(prod_id)
     # Deleta arquivos fisicos do disco
@@ -282,6 +523,7 @@ def del_produto(prod_id):
 
 # API CRUDS Clientes e Histórico
 @app.route('/api/clientes', methods=['GET', 'POST'])
+@role_required(1)
 def api_clientes():
     if request.method == 'GET':
         resultado = []
@@ -323,6 +565,7 @@ def api_clientes():
         return jsonify({"status": "success", "id": c.id})
 
 @app.route('/api/clientes/<int:item_id>', methods=['DELETE'])
+@role_required(1)
 def del_cliente(item_id):
     c = Cliente.query.get_or_404(item_id)
     # Impede deleção se tiver pedidos
@@ -334,6 +577,7 @@ def del_cliente(item_id):
 
 # API CRUDS Materiais e Desgastes
 @app.route('/api/materiais', methods=['POST'])
+@role_required(2)
 def add_material():
     data = request.json
     m = Material(
@@ -350,6 +594,7 @@ def add_material():
     return jsonify({"status": "success", "id": m.id})
 
 @app.route('/api/materiais/<int:item_id>', methods=['DELETE'])
+@role_required(2)
 def del_material(item_id):
     m = Material.query.get_or_404(item_id)
     db.session.delete(m)
@@ -357,6 +602,7 @@ def del_material(item_id):
     return jsonify({"status": "deleted"})
 
 @app.route('/api/materiais/<int:item_id>/estoque', methods=['POST'])
+@role_required(2)
 def update_estoque_material(item_id):
     m = Material.query.get_or_404(item_id)
     data = request.json
@@ -374,6 +620,7 @@ def update_estoque_material(item_id):
     return jsonify({"status": "success", "quantidade_atual": m.quantidade_atual})
 
 @app.route('/api/desgastes', methods=['POST'])
+@role_required(2)
 def add_desgaste():
     data = request.json
     d = Desgaste(
@@ -386,6 +633,7 @@ def add_desgaste():
     return jsonify({"status": "success", "id": d.id})
 
 @app.route('/api/desgastes/<int:item_id>', methods=['DELETE'])
+@role_required(2)
 def del_desgaste(item_id):
     d = Desgaste.query.get_or_404(item_id)
     db.session.delete(d)
@@ -393,6 +641,7 @@ def del_desgaste(item_id):
     return jsonify({"status": "deleted"})
 # API KANBAN / PEDIDOS
 @app.route('/api/pedidos', methods=['GET', 'POST'])
+@role_required(1)
 def handle_pedidos():
     if request.method == 'GET':
         pedidos = Pedido.query.all()
@@ -473,6 +722,7 @@ def handle_pedidos():
         return jsonify({"status": "success", "pedido_id": novo_pedido.id})
 
 @app.route('/api/pedidos/<int:pedido_id>', methods=['DELETE', 'PUT'])
+@role_required(1)
 def gerenciar_pedido_individual(pedido_id):
     pedido = Pedido.query.get_or_404(pedido_id)
     if request.method == 'DELETE':
@@ -491,6 +741,7 @@ def gerenciar_pedido_individual(pedido_id):
         return jsonify({"status": "updated"})
 
 @app.route('/api/pedidos/<int:pedido_id>/fase', methods=['POST'])
+@role_required(1)
 def atualizar_fase_pedido(pedido_id):
     data = request.json
     pedido = Pedido.query.get_or_404(pedido_id)
@@ -502,5 +753,24 @@ def atualizar_fase_pedido(pedido_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    # Permitindo acesso pela rede local via host '0.0.0.0'
-    app.run(host='0.0.0.0', debug=True, port=5000)
+        # Cria usuário admin padrão se não existir
+        if not Usuario.query.filter_by(username='admin').first():
+            admin_user = Usuario(username='admin', role='Administrador')
+            admin_user.set_password('admin')
+            db.session.add(admin_user)
+        # Cria usuário gerente padrão se não existir
+        if not Usuario.query.filter_by(username='gerente').first():
+            gerente_user = Usuario(username='gerente', role='Gerente')
+            gerente_user.set_password('gerente')
+            db.session.add(gerente_user)
+        # Cria usuário usuário padrão se não existir
+        if not Usuario.query.filter_by(username='usuario').first():
+            usuario_user = Usuario(username='usuario', role='Usuário')
+            usuario_user.set_password('usuario')
+            db.session.add(usuario_user)
+        db.session.commit()
+        print("Contas padrão admin, gerente e usuário criadas (se não existiam).")
+        # Se já existia admin, ainda imprime mensagem de criação acima; pode ser ajustado
+        
+        # Permitindo acesso pela rede local via host '0.0.0.0'
+        app.run(host='0.0.0.0', debug=True, port=5000)

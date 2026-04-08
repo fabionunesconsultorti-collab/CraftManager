@@ -1,5 +1,19 @@
 from database import db
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class Usuario(db.Model):
+    __tablename__ = 'usuarios'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='Usuário') # Administrador, Gerente, Usuário
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Cliente(db.Model):
     __tablename__ = 'clientes'
@@ -22,6 +36,7 @@ class ConfiguracaoOperacional(db.Model):
     eficiencia_percentual = db.Column(db.Float, default=80.0) # 80%
     pro_labore = db.Column(db.Float, default=2500.0)
     taxa_energia_kwh = db.Column(db.Float, default=0.80)
+    previsao_energia_mensal = db.Column(db.Float, default=0.0)
 
 class CustoFixo(db.Model):
     __tablename__ = 'custos_fixos'
@@ -110,3 +125,14 @@ class ItemPedido(db.Model):
     quantidade = db.Column(db.Integer, nullable=False, default=1)
     valor_unitario = db.Column(db.Float, nullable=False)
     valor_subtotal = db.Column(db.Float, nullable=False)
+
+class ConfiguracaoVisual(db.Model):
+    __tablename__ = 'configuracoes_visuais'
+    id = db.Column(db.Integer, primary_key=True)
+    nome_empresa = db.Column(db.String(100), default="CraftManager")
+    logo_path = db.Column(db.String(255), nullable=True)
+    favicon_path = db.Column(db.String(255), nullable=True)
+    cor_primaria = db.Column(db.String(10), default="#6366f1")
+    cor_secundaria = db.Column(db.String(10), default="#8b5cf6")
+    cor_fundo = db.Column(db.String(10), default="#0f172a")
+    fonte_principal = db.Column(db.String(50), default="Outfit")

@@ -118,7 +118,7 @@
                 <label>Qtd</label>
                 <input type="number" class="form-control" id="cat-qtd" value="1">
             </div>
-            <button class="btn-submit" type="button" style="margin:0; width:auto; padding:0.8rem 1.2rem" onclick="addAoCarrinho()">+ Add</button>
+            <button class="btn" type="button" onclick="addAoCarrinho()">+ Add</button>
         </div>
 
         <div style="background:rgba(0,0,0,0.2); border-radius:0.5rem; border:1px solid var(--surface-border); min-height:100px; padding:1rem; margin-bottom:1.5rem;">
@@ -165,8 +165,8 @@
         </div>
 
         <div style="display:flex; gap:1rem;">
-            <button type="button" class="btn-submit" onclick="finalizarPedido(false)" style="background:var(--success)"><i class="fa-solid fa-paper-plane"></i> Mover p/ Kanban</button>
-            <button type="button" class="btn-submit" onclick="finalizarPedido(true)" style="background:var(--primary-color)"><i class="fa-solid fa-print"></i> Salvar e Imprimir Orçamento PDF</button>
+            <button type="button" class="btn btn-success" onclick="finalizarPedido(false)"><i class="fa-solid fa-paper-plane"></i> Mover p/ Kanban</button>
+            <button type="button" class="btn" onclick="finalizarPedido(true)"><i class="fa-solid fa-print"></i> Salvar e Imprimir Orçamento PDF</button>
         </div>
     </div>
 </div>
@@ -254,7 +254,7 @@
                    <td>${item.quantidade}x</td>
                    <td>R$ ${item.valor_unitario.toFixed(2)}</td>
                    <td style="color:white; font-weight:bold">R$ ${item.subtotal.toFixed(2)}</td>
-                   <td><button onclick="removerCart(${item.uid})" style="background:transparent; color:var(--danger); border:none; cursor:pointer"><i class="fa-solid fa-xmark"></i></button></td>
+                   <td><button onclick="removerCart(${item.uid})" class="btn-icon"><i class="fa-solid fa-xmark"></i></button></td>
                </tr> 
             `;
         });
